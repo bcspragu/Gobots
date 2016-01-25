@@ -20,21 +20,67 @@ const (
 	SelfDamage      = 1000 // Make them super dead
 )
 
-type collisionMap map[Loc][]RobotID
+type collisionMap map[Loc][]*Robot
+
+type LocPair struct {
+	L Loc
+	B *Robot
+}
 
 type Board struct {
-	Cells []*Robot
+	Locs  map[Loc]*Robot
 	Size  Loc
 	Round int
 
-	nextID RobotID
+	NextID RobotID
+}
+
+type JSONBoard struct {
+	Pairs []LocPair
+	Size  Loc
+	Round int
+
+	NextID RobotID
+}
+
+func (b *Board) ToJSONBoard() *JSONBoard {
+	j := &JSONBoard{
+		Size:   b.Size,
+		Round:  b.Round,
+		NextID: b.NextID,
+	}
+
+	j.Pairs = make([]LocPair, len(b.Locs))
+	i := 0
+	for loc, bot := range b.Locs {
+		j.Pairs[i] = LocPair{
+			L: loc,
+			B: bot,
+		}
+		i++
+	}
+	return j
+}
+
+func (j *JSONBoard) ToBoard() *Board {
+	b := &Board{
+		Locs:   make(map[Loc]*Robot),
+		Size:   j.Size,
+		Round:  j.Round,
+		NextID: j.NextID,
+	}
+
+	for _, pair := range j.Pairs {
+		b.Locs[pair.L] = pair.B
+	}
+	return b
 }
 
 // EmptyBoard creates an empty board of the given size.
 func EmptyBoard(w, h int) *Board {
 	return &Board{
-		Cells: make([]*Robot, w*h),
-		Size:  Loc{w, h},
+		Locs: make(map[Loc]*Robot),
+		Size: Loc{w, h},
 	}
 }
 
@@ -47,8 +93,8 @@ func (b *Board) Height() int {
 }
 
 func (b *Board) newID() RobotID {
-	b.nextID++
-	return b.nextID
+	b.NextID++
+	return b.NextID
 }
 
 // NewBoard creates an initialized game board for two factions.
@@ -61,13 +107,12 @@ func NewBoard(w, h int) *Board {
 			continue
 		}
 		la, lb := Loc{0, i}, Loc{w - 1, i}
-		ca, cb := b.cellIndex(la), b.cellIndex(lb)
-		b.Cells[ca] = &Robot{
+		b.Locs[la] = &Robot{
 			ID:      b.newID(),
 			Health:  InitialHealth,
 			Faction: P1Faction,
 		}
-		b.Cells[cb] = &Robot{
+		b.Locs[lb] = &Robot{
 			ID:      b.newID(),
 			Health:  InitialHealth,
 			Faction: P2Faction,
@@ -84,16 +129,14 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 	// Move the bots to their new locations, unless they collide with something,
 	// in which case just subtract 1 from their health and don't move them.
 
-	for loc, botIDs := range c {
+	for loc, bots := range c {
 		// If there's only one bot trying to get somewhere, just move them there
-		if len(botIDs) == 1 {
-			b.moveBot(botIDs[0], loc)
+		if len(bots) == 1 {
+			b.moveBot(bots[0], loc)
 		}
 
 		// Multiple bots, hurt 'em
-		for _, id := range botIDs {
-			// TODO: nil check, for safety
-			bot := b.robot(id)
+		for _, bot := range bots {
 			b.hurtBot(bot, CollisionDamage)
 		}
 	}
@@ -132,7 +175,7 @@ func (b *Board) issueAttacks(ts botapi.Turn_List) {
 		}
 
 		// They're attacking
-		loc := b.robotLoc(RobotID(t.Id()))
+		loc, _ := b.fromID(RobotID(t.Id()))
 		xOff, yOff := directionOffsets(t.Attack())
 		attackLoc := Loc{
 			X: loc.X + xOff,
@@ -140,8 +183,8 @@ func (b *Board) issueAttacks(ts botapi.Turn_List) {
 		}
 
 		// If there's a bot at the attack location, make them sad
-		// NOTE: You *can* hurt attack your own robots
-		victim := b.At(attackLoc)
+		// You *can* hurt attack your own robots
+		victim := b.Locs[attackLoc]
 		if victim != nil {
 			b.hurtBot(victim, AttackDamage)
 		}
@@ -157,19 +200,27 @@ func (b *Board) issueSelfDestructs(ts botapi.Turn_List) {
 
 		// They're Metro-booming on production:
 		// (https://www.youtube.com/watch?v=NiM5ARaexPE)
-		loc := b.robotLoc(RobotID(t.Id()))
+		loc, bomber := b.fromID(RobotID(t.Id()))
 		for _, boomLoc := range b.surrounding(loc) {
 			// If there's a bot in the blast radius
-			victim := b.At(boomLoc)
+			victim := b.Locs[boomLoc]
 			if victim != nil {
 				b.hurtBot(victim, DestructDamage)
 			}
 		}
 
-		bomber := b.At(loc)
 		// Kill 'em
 		b.hurtBot(bomber, SelfDamage)
 	}
+}
+
+func (b *Board) fromID(id RobotID) (Loc, *Robot) {
+	for loc, bot := range b.Locs {
+		if bot.ID == id {
+			return loc, bot
+		}
+	}
+	return Loc{}, nil
 }
 
 func (b *Board) surrounding(loc Loc) []Loc {
@@ -198,10 +249,10 @@ func (b *Board) surrounding(loc Loc) []Loc {
 func (b *Board) addCollisions(c collisionMap, ts botapi.Turn_List) {
 	for i := 0; i < ts.Len(); i++ {
 		t := ts.At(i)
-		id := RobotID(t.Id())
-		nextLoc := b.nextLoc(id, t)
+		_, bot := b.fromID(RobotID(t.Id()))
+		nextLoc := b.nextLoc(bot, t)
 		// Add where they want to move
-		c[nextLoc] = append(c[nextLoc], id)
+		c[nextLoc] = append(c[nextLoc], bot)
 	}
 }
 
@@ -210,36 +261,29 @@ func (b *Board) hurtBot(r *Robot, damage int) {
 }
 
 func (b *Board) clearTheDead() {
-	for _, bot := range b.Cells {
-		if bot == nil {
-			continue
-		}
+	var killKeys []Loc
+	for loc, bot := range b.Locs {
 
 		// Smite them
 		if bot.Health <= 0 {
-			loc := b.robotLoc(bot.ID)
-			ind := b.cellIndex(loc)
-			b.Cells[ind] = nil // BOoOoOM, roasted
+			killKeys = append(killKeys, loc)
 		}
+	}
+
+	for _, loc := range killKeys {
+		delete(b.Locs, loc)
 	}
 }
 
 // TODO: Maybe make sure they're not teleporting across the board
-func (b *Board) moveBot(id RobotID, loc Loc) {
-	oldLoc := b.robotLoc(id)
-	ind := b.cellIndex(oldLoc)
-
-	bot := b.Cells[ind]
-	b.Cells[ind] = nil
-	b.Cells[b.cellIndex(loc)] = bot
+func (b *Board) moveBot(bot *Robot, loc Loc) {
+	oldLoc := b.robotLoc(bot)
+	delete(b.Locs, oldLoc)
+	b.Locs[loc] = bot
 }
 
-func (b *Board) cellIndex(loc Loc) int {
-	return loc.Y*b.Size.X + loc.X
-}
-
-func (b *Board) nextLoc(id RobotID, t botapi.Turn) Loc {
-	currentLoc := b.robotLoc(id)
+func (b *Board) nextLoc(bot *Robot, t botapi.Turn) Loc {
+	currentLoc := b.robotLoc(bot)
 	// If they aren't moving, return their current loc
 	if t.Which() != botapi.Turn_Which_move {
 		return currentLoc
@@ -277,38 +321,13 @@ func directionOffsets(dir botapi.Direction) (x, y int) {
 	return xOff, yOff
 }
 
-// TODO: Jesus Christ this is inefficient, we should have a map from ids to
-// locations for O(1) lookups, our turn algorithm is going to be like O(n^3),
-// which doesn't matter for like 10 bots, but still.
-func (b *Board) robotLoc(id RobotID) Loc {
-	for i, c := range b.Cells {
-		if c == nil {
-			continue
-		}
-		if c.ID != id {
-			continue
-		}
-
-		return Loc{
-			X: i % b.Size.X,
-			Y: i / b.Size.X,
+func (b *Board) robotLoc(r *Robot) Loc {
+	for loc, bot := range b.Locs {
+		if bot.ID == r.ID {
+			return loc
 		}
 	}
 	return Loc{}
-}
-
-func (b *Board) robot(id RobotID) *Robot {
-	for _, c := range b.Cells {
-		if c == nil {
-			continue
-		}
-		if c.ID != id {
-			continue
-		}
-
-		return c
-	}
-	return nil
 }
 
 // IsFinished reports whether the game is finished.
@@ -317,31 +336,12 @@ func (b *Board) IsFinished() bool {
 }
 
 // At returns the robot at a location or nil if not found.
-func (b *Board) At(loc Loc) *Robot {
-	if !b.isValidLoc(loc) {
-		// TODO: Is panic the right thing to do here?
-		panic("location out of bounds")
-	}
-	return b.Cells[loc.Y*b.Size.X+loc.X]
-}
-
-// At returns the robot at a location or nil if not found.
 func (b *Board) AtXY(x, y int) *Robot {
 	if !b.isValidLoc(Loc{x, y}) {
 		// TODO: Is panic the right thing to do here?
 		panic("location out of bounds")
 	}
-	return b.Cells[y*b.Size.X+x]
-}
-
-// Set sets a robot at a particular location.
-// Used for initialization.
-func (b *Board) Set(loc Loc, r *Robot) {
-	if !b.isValidLoc(loc) {
-		// TODO: Is panic the right thing to do here?
-		panic("location out of bounds")
-	}
-	b.Cells[loc.Y*b.Size.X+loc.X] = r
+	return b.Locs[Loc{X: x, Y: y}]
 }
 
 func (b *Board) isValidLoc(loc Loc) bool {
@@ -355,28 +355,20 @@ func (b *Board) ToWire(out botapi.Board, faction int) error {
 	out.SetHeight(uint16(b.Size.Y))
 	out.SetRound(int32(b.Round))
 
-	n := 0
-	for _, r := range b.Cells {
-		if r != nil {
-			n++
-		}
-	}
-	robots, err := botapi.NewRobot_List(out.Segment(), int32(n))
+	robots, err := botapi.NewRobot_List(out.Segment(), int32(len(b.Locs)))
 	if err != nil {
 		return err
 	}
 	if err = out.SetRobots(robots); err != nil {
 		return err
 	}
-	n = 0
-	for i, r := range b.Cells {
-		if r == nil {
-			continue
-		}
+
+	n := 0
+	for loc, r := range b.Locs {
 		outr := robots.At(n)
 		outr.SetId(uint32(r.ID))
-		outr.SetX(uint16(i % b.Size.X))
-		outr.SetY(uint16(i / b.Size.X))
+		outr.SetX(uint16(loc.X))
+		outr.SetY(uint16(loc.Y))
 		outr.SetHealth(int16(r.Health))
 		if r.Faction == faction {
 			outr.SetFaction(botapi.Faction_mine)

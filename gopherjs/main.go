@@ -17,7 +17,7 @@ func main() {
 }
 
 func GetBoard(jsonBoard string) *js.Object {
-	var board *engine.Board
-	json.Unmarshal([]byte(jsonBoard), &board)
-	return js.MakeWrapper(board)
+	var jBoard *engine.JSONBoard
+	json.Unmarshal([]byte(jsonBoard), &jBoard)
+	return js.MakeWrapper(jBoard.ToBoard())
 }

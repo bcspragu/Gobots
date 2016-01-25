@@ -57,7 +57,7 @@ func boardFromWire(wire botapi.Board) (*Board, error) {
 			X: int(bot.X()),
 			Y: int(bot.Y()),
 		}
-		b.Cells[b.cellIndex(loc)] = robotFromWire(bot)
+		b.Locs[loc] = robotFromWire(bot)
 	}
 
 	return b, nil

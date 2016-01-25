@@ -102,7 +102,13 @@ func serveGame(c context) {
 
 	// If we're here, they're looking for a single boards encoding
 	board, err := engine.NewPlayback(replay).Board(c.roundNumber())
-	d, err := json.Marshal(board)
+	if err != nil {
+		serveError(c.w, err)
+	}
+	d, err := json.Marshal(board.ToJSONBoard())
+	if err != nil {
+		serveError(c.w, err)
+	}
 	c.w.Write(d)
 }
 

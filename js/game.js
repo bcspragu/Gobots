@@ -4,7 +4,7 @@ angular.module('gobotApp', [])
   game.round = 0;
 
   game.updateBoard = function(board) {
-    game.board = board
+    game.board = board;
     game.rows = new Array(board.Height())
     for (var y = 0; y < board.Height(); y++) {
       game.rows[y] = new Array(board.Width())
