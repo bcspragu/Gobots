@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gophergala2016/Gobots/easyai"
+	"github.com/bcspragu/Gobots/easyai"
 )
 
 var (

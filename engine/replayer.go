@@ -1,30 +1,27 @@
 package engine
 
 import (
-	"github.com/gophergala2016/Gobots/botapi"
+	"github.com/bcspragu/Gobots/botapi"
 )
 
-type Replay struct {
-	botapi.Replay
-	round int
+type Playback struct {
+	replay botapi.Replay
 }
 
-func NewReplay(r botapi.Replay) *Replay {
-	return &Replay{r, 0}
+func NewPlayback(r botapi.Replay) *Playback {
+	return &Playback{r}
 }
 
-func (r *Replay) NextBoard() *Board {
+func (p *Playback) Board(round int) *Board {
 	// TODO: Stop ignoring errors
-	if r.round == 0 {
-		w, _ := r.InitialBoard()
+	if round == 0 {
+		w, _ := p.replay.InitialBoard()
 		b, _ := boardFromWire(w)
-		r.round++
 		return b
 	} else {
-		rs, _ := r.Rounds()
-		w, _ := rs.At(r.round).EndBoard()
+		rs, _ := p.replay.Rounds()
+		w, _ := rs.At(round).EndBoard()
 		b, _ := boardFromWire(w)
-		r.round++
 		return b
 	}
 }

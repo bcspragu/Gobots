@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gophergala2016/Gobots/botapi"
-	"github.com/gophergala2016/Gobots/engine"
+	"github.com/bcspragu/Gobots/botapi"
+	"github.com/bcspragu/Gobots/engine"
 	gocontext "golang.org/x/net/context"
 	"zombiezen.com/go/capnproto2"
 	"zombiezen.com/go/capnproto2/rpc"

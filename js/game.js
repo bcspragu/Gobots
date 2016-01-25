@@ -1,9 +1,10 @@
 angular.module('gobotApp', [])
 .controller('GameController', function() {
   var game = this;
-  var replay = Gobot.GetReplay("http://" + Host + "game/"+ GameID);
+  game.round = 0;
 
   game.setBoard = function(board) {
+    game.board = board
     game.rows = new Array(board.Height())
     for (var y = 0; y < board.Height(); y++) {
       game.rows[y] = new Array(board.Width())
@@ -13,12 +14,22 @@ angular.module('gobotApp', [])
     }
   }
 
-  game.setBoard(replay.NextBoard());
+  $.get(buildUrl(game.round), function(resp) {
+    game.board = Gobot.GetBoard(resp)
+    debugger;
+  });
   window.setTimeout(function() {
-    game.setBoard(replay.NextBoard());
+    game.round++;
+    $.get(buildUrl(game.round), function(resp) {
+      game.board = Gobot.GetBoard(resp)
+    });
   }, 1000);
 })
 .config(function($interpolateProvider) {
-  $interpolateProvider.startSymbol('//');
-  $interpolateProvider.endSymbol('//');
+  $interpolateProvider.startSymbol('[[');
+  $interpolateProvider.endSymbol(']]');
 });
+
+function buildUrl(round) {
+  return "http://" + Host + "/game/" + GameID + "/" + round
+}

@@ -1,6 +1,6 @@
 package main
 
-import "github.com/gophergala2016/Gobots/easyai"
+import "github.com/bcspragu/Gobots/easyai"
 
 type pathfinder struct {
 	targets map[uint32]uint32

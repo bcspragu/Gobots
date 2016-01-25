@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/gophergala2016/Gobots/botapi"
+	"github.com/bcspragu/Gobots/botapi"
 )
 
 // TODO: Fix the super inconsistent board API that alternates between taking in

@@ -10,7 +10,7 @@ import (
 	"zombiezen.com/go/capnproto2"
 
 	"github.com/boltdb/bolt"
-	"github.com/gophergala2016/Gobots/botapi"
+	"github.com/bcspragu/Gobots/botapi"
 )
 
 type datastore interface {

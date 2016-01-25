@@ -4,7 +4,7 @@ package easyai
 import (
 	"net"
 
-	"github.com/gophergala2016/Gobots/botapi"
+	"github.com/bcspragu/Gobots/botapi"
 	"golang.org/x/net/context"
 	"zombiezen.com/go/capnproto2/rpc"
 )

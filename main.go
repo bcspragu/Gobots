@@ -13,8 +13,8 @@ import (
 	"strings"
 
 	gocontext "golang.org/x/net/context"
-	"zombiezen.com/go/capnproto2"
 
+	"github.com/bcspragu/Gobots/engine"
 	"github.com/gorilla/securecookie"
 )
 
@@ -51,7 +51,6 @@ func main() {
 
 	http.HandleFunc("/", withLogin(serveIndex))
 	http.HandleFunc("/game/", withLogin(serveGame))
-	http.HandleFunc("/gameWire/", withLogin(serveGameWire))
 	http.HandleFunc("/auth", withLogin(serveAuth))
 	http.HandleFunc("/loadBots", withLogin(loadBots))
 	http.HandleFunc("/startMatch", withLogin(startMatch))
@@ -88,23 +87,22 @@ func serveIndex(c context) {
 
 func serveGame(c context) {
 	replay, err := db.lookupGame(c.gameID())
-	d := capnp.ToData(replay)
-	data := tmplData{
-		Data: map[string]interface{}{
-			"Replay":       replay,
-			"GameID":       c.gameID(),
-			"Exists":       err != errDatastoreNotFound,
-			"ReplayString": string(d),
-		},
+	if c.roundNumber() == -1 {
+		data := tmplData{
+			Data: map[string]interface{}{
+				"GameID": c.gameID(),
+				"Exists": err != errDatastoreNotFound,
+			},
+		}
+		if err := templates.ExecuteTemplate(c, "game.html", data); err != nil {
+			serveError(c.w, err)
+		}
+		return
 	}
-	if err := templates.ExecuteTemplate(c, "game.html", data); err != nil {
-		serveError(c.w, err)
-	}
-}
 
-func serveGameWire(c context) {
-	replay, _ := db.lookupGame(c.gameID())
-	d := capnp.ToData(replay)
+	// If we're here, they're looking for a single boards encoding
+	board := engine.NewPlayback(replay).Board(c.roundNumber())
+	d, err := json.Marshal(board)
 	c.w.Write(d)
 }
 

@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/gophergala2016/Gobots/botapi"
+	"github.com/bcspragu/Gobots/botapi"
 	"zombiezen.com/go/capnproto2"
 )
 
