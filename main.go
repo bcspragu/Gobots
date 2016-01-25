@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 
+	gocontext "golang.org/x/net/context"
 	"zombiezen.com/go/capnproto2"
 
 	"github.com/gorilla/securecookie"
@@ -129,7 +130,7 @@ func startMatch(c context) {
 	gidCh := make(chan gameID)
 	go func() {
 		err := runMatch(gidCh, gocontext.TODO(), db, o1, o2)
-		close(gid)
+		close(gidCh)
 		if err != nil {
 			log.Println("runMatch:", err)
 		}
