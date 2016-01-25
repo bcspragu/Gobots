@@ -24,7 +24,7 @@ func (aggro) RobotTick(b *easyai.Board, r *easyai.Robot) easyai.Turn {
 }
 
 func opponentAt(b *easyai.Board, loc easyai.Loc) bool {
-	if b.IsInside(loc) {
+	if !b.IsInside(loc) {
 		return false
 	}
 	r := b.At(loc)

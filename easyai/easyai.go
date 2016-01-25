@@ -29,7 +29,7 @@ func (b *Board) IsInside(loc Loc) bool {
 func (b *Board) Find(f func(*Robot) bool) *Robot {
 	for _, row := range b.Cells {
 		for _, r := range row {
-			if f(r) {
+			if r != nil && f(r) {
 				return r
 			}
 		}

@@ -36,7 +36,7 @@ func (pf *pathfinder) RobotTick(b *easyai.Board, r *easyai.Robot) easyai.Turn {
 		if pf.targets == nil {
 			pf.targets = make(map[uint32]uint32)
 		}
-		opp := nearestOpponent(b, r.Loc)
+		opp = nearestOpponent(b, r.Loc)
 		if opp == nil {
 			return easyai.Turn{Kind: easyai.Wait}
 		}
