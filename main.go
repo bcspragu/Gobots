@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -112,10 +113,35 @@ func serveError(w http.ResponseWriter, err error) {
 }
 
 func startMatch(c context) {
-	//ai1, ai2 := c.r.PostFormValue("ai1"), c.r.PostFormValue("ai2")
 	//TODO DOIAFJHJKSHLAJSDLKJASLKDJ
+	ai1, _ := db.lookupAI(aiID(c.r.FormValue("ai1")))
+	ai2, _ := db.lookupAI(aiID(c.r.FormValue("ai2")))
+	online := globalAIEndpoint.listOnlineAIs()
+	var o1, o2 *onlineAI
+	for _, v := range online {
+		if v.Info.ID == ai1.ID {
+			o1 = &v
+		} else if v.Info.ID == ai2.ID {
+			o2 = &v
+		}
+	}
 
-	http.Redirect(c.w, c.r, "/game/GAMEIDHERE", http.StatusFound)
+	gidCh := make(chan gameID)
+	go func() {
+		err := runMatch(gidCh, gocontext.TODO(), db, o1, o2)
+		close(gid)
+		if err != nil {
+			log.Println("runMatch:", err)
+		}
+	}()
+	gid := <-gidCh
+	if gid == "" {
+		serveError(c.w, errors.New("game couldn't start"))
+	} else {
+		http.Redirect(c.w, c.r, "/game/"+string(gid), http.StatusFound)
+	}
+}
+func hackfight(c context) {
 }
 
 func loadBots(c context) {

@@ -114,7 +114,7 @@ func (aic *aiConnector) drop() {
 	aic.e.removeAIs(aic.ais)
 }
 
-func runMatch(ctx gocontext.Context, ds datastore, aiA, aiB *onlineAI) error {
+func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB *onlineAI) error {
 	// Create new board and store it.
 	b := engine.NewBoard(20, 20)
 	_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
@@ -124,6 +124,7 @@ func runMatch(ctx gocontext.Context, ds datastore, aiA, aiB *onlineAI) error {
 	if err != nil {
 		return err
 	}
+	gidCh <- gid
 
 	// Run the game
 	for !b.IsFinished() {
