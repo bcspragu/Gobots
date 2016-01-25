@@ -119,7 +119,7 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 	b := engine.NewBoard(10, 10)
 	_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
 	wb, _ := botapi.NewRootBoard(seg)
-	b.ToWire(wb, 0)
+	b.ToWire(wb, engine.P1Faction)
 	gid, err := ds.startGame(aiA.Info.ID, aiB.Info.ID, wb)
 	if err != nil {
 		return err
@@ -130,8 +130,8 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 	for !b.IsFinished() {
 		turnCtx, _ := gocontext.WithTimeout(ctx, 30*time.Second)
 		chA, chB := make(chan turnResult), make(chan turnResult)
-		go aiA.takeTurn(turnCtx, gid, b, 0, chA)
-		go aiB.takeTurn(turnCtx, gid, b, 1, chB)
+		go aiA.takeTurn(turnCtx, gid, b, engine.P1Faction, chA)
+		go aiB.takeTurn(turnCtx, gid, b, engine.P2Faction, chB)
 		ra, rb := <-chA, <-chB
 		if ra.err.HasError() || rb.err.HasError() {
 			// TODO: Something with errors

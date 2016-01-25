@@ -11,9 +11,11 @@ import (
 // *Robots and RobotIDs, it's gross
 
 const (
-	P1Faction       = 1
-	P2Faction       = 2
-	InitialHealth   = 5
+	P1Faction = 1
+	P2Faction = 2
+
+	InitialHealth = 5
+
 	CollisionDamage = 1
 	AttackDamage    = 2
 	DestructDamage  = 2

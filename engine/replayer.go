@@ -29,7 +29,7 @@ func (p *Playback) Board(round int) (*Board, error) {
 		if err != nil {
 			return nil, err
 		}
-		w, err := rs.At(round).EndBoard()
+		w, err := rs.At(round - 1).EndBoard()
 		if err != nil {
 			return nil, err
 		}
