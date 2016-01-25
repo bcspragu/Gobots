@@ -23,7 +23,7 @@ const (
 type collisionMap map[Loc][]RobotID
 
 type Board struct {
-	cells []*Robot
+	Cells []*Robot
 	Size  Loc
 	Round int
 
@@ -33,7 +33,7 @@ type Board struct {
 // EmptyBoard creates an empty board of the given size.
 func EmptyBoard(w, h int) *Board {
 	return &Board{
-		cells: make([]*Robot, w*h),
+		Cells: make([]*Robot, w*h),
 		Size:  Loc{w, h},
 	}
 }
@@ -56,15 +56,18 @@ func NewBoard(w, h int) *Board {
 	b := EmptyBoard(w, h)
 
 	// Just line the ends with robots
-	for i := 0; i < h; i++ {
+	for i := 1; i < h-1; i++ {
+		if i%2 == 0 {
+			continue
+		}
 		la, lb := Loc{0, i}, Loc{w - 1, i}
 		ca, cb := b.cellIndex(la), b.cellIndex(lb)
-		b.cells[ca] = &Robot{
+		b.Cells[ca] = &Robot{
 			ID:      b.newID(),
 			Health:  InitialHealth,
 			Faction: P1Faction,
 		}
-		b.cells[cb] = &Robot{
+		b.Cells[cb] = &Robot{
 			ID:      b.newID(),
 			Health:  InitialHealth,
 			Faction: P2Faction,
@@ -207,7 +210,7 @@ func (b *Board) hurtBot(r *Robot, damage int) {
 }
 
 func (b *Board) clearTheDead() {
-	for _, bot := range b.cells {
+	for _, bot := range b.Cells {
 		if bot == nil {
 			continue
 		}
@@ -216,7 +219,7 @@ func (b *Board) clearTheDead() {
 		if bot.Health <= 0 {
 			loc := b.robotLoc(bot.ID)
 			ind := b.cellIndex(loc)
-			b.cells[ind] = nil // BOoOoOM, roasted
+			b.Cells[ind] = nil // BOoOoOM, roasted
 		}
 	}
 }
@@ -226,9 +229,9 @@ func (b *Board) moveBot(id RobotID, loc Loc) {
 	oldLoc := b.robotLoc(id)
 	ind := b.cellIndex(oldLoc)
 
-	bot := b.cells[ind]
-	b.cells[ind] = nil
-	b.cells[b.cellIndex(loc)] = bot
+	bot := b.Cells[ind]
+	b.Cells[ind] = nil
+	b.Cells[b.cellIndex(loc)] = bot
 }
 
 func (b *Board) cellIndex(loc Loc) int {
@@ -278,7 +281,7 @@ func directionOffsets(dir botapi.Direction) (x, y int) {
 // locations for O(1) lookups, our turn algorithm is going to be like O(n^3),
 // which doesn't matter for like 10 bots, but still.
 func (b *Board) robotLoc(id RobotID) Loc {
-	for i, c := range b.cells {
+	for i, c := range b.Cells {
 		if c == nil {
 			continue
 		}
@@ -295,7 +298,7 @@ func (b *Board) robotLoc(id RobotID) Loc {
 }
 
 func (b *Board) robot(id RobotID) *Robot {
-	for _, c := range b.cells {
+	for _, c := range b.Cells {
 		if c == nil {
 			continue
 		}
@@ -319,7 +322,7 @@ func (b *Board) At(loc Loc) *Robot {
 		// TODO: Is panic the right thing to do here?
 		panic("location out of bounds")
 	}
-	return b.cells[loc.Y*b.Size.X+loc.X]
+	return b.Cells[loc.Y*b.Size.X+loc.X]
 }
 
 // At returns the robot at a location or nil if not found.
@@ -328,7 +331,7 @@ func (b *Board) AtXY(x, y int) *Robot {
 		// TODO: Is panic the right thing to do here?
 		panic("location out of bounds")
 	}
-	return b.cells[y*b.Size.X+x]
+	return b.Cells[y*b.Size.X+x]
 }
 
 // Set sets a robot at a particular location.
@@ -338,7 +341,7 @@ func (b *Board) Set(loc Loc, r *Robot) {
 		// TODO: Is panic the right thing to do here?
 		panic("location out of bounds")
 	}
-	b.cells[loc.Y*b.Size.X+loc.X] = r
+	b.Cells[loc.Y*b.Size.X+loc.X] = r
 }
 
 func (b *Board) isValidLoc(loc Loc) bool {
@@ -353,7 +356,7 @@ func (b *Board) ToWire(out botapi.Board, faction int) error {
 	out.SetRound(int32(b.Round))
 
 	n := 0
-	for _, r := range b.cells {
+	for _, r := range b.Cells {
 		if r != nil {
 			n++
 		}
@@ -366,7 +369,7 @@ func (b *Board) ToWire(out botapi.Board, faction int) error {
 		return err
 	}
 	n = 0
-	for i, r := range b.cells {
+	for i, r := range b.Cells {
 		if r == nil {
 			continue
 		}

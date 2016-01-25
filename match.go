@@ -116,7 +116,7 @@ func (aic *aiConnector) drop() {
 
 func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB *onlineAI) error {
 	// Create new board and store it.
-	b := engine.NewBoard(20, 20)
+	b := engine.NewBoard(10, 10)
 	_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
 	wb, _ := botapi.NewRootBoard(seg)
 	b.ToWire(wb, 0)

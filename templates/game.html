@@ -1,8 +1,8 @@
 {{ if .Data.Exists }}
-<div class="splash">
-  <h1 class="splash-head">Game</h1>
+<div class="splash" ng-controller="GameController as game">
+  <h1 class="splash-head">Round [[game.round]]</h1>
   <div class="gameBoardContainer">
-    <div ng-controller="GameController as game" class="gameBoard">
+    <div class="gameBoard">
       <div class="row" ng-repeat="row in game.rows track by $index">
         <div class="cell" ng-repeat="cell in row track by $index" ng-class="{gopher: cell !== null}" >
           <img class="go-img" ng-src="[[cell.Faction == 1 ? '/img/gopher.jpg' : '/img/gopher2.jpg']]" ng-show="cell !== null"></div>
