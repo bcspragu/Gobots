@@ -9,8 +9,8 @@ import (
 
 	"zombiezen.com/go/capnproto2"
 
-	"github.com/boltdb/bolt"
 	"github.com/bcspragu/Gobots/botapi"
+	"github.com/boltdb/bolt"
 )
 
 type datastore interface {

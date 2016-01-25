@@ -12,17 +12,32 @@ func NewPlayback(r botapi.Replay) *Playback {
 	return &Playback{r}
 }
 
-func (p *Playback) Board(round int) *Board {
+func (p *Playback) Board(round int) (*Board, error) {
 	// TODO: Stop ignoring errors
 	if round == 0 {
-		w, _ := p.replay.InitialBoard()
-		b, _ := boardFromWire(w)
-		return b
+		w, err := p.replay.InitialBoard()
+		if err != nil {
+			return nil, err
+		}
+		b, err := boardFromWire(w)
+		if err != nil {
+			return nil, err
+		}
+		return b, nil
 	} else {
-		rs, _ := p.replay.Rounds()
-		w, _ := rs.At(round).EndBoard()
-		b, _ := boardFromWire(w)
-		return b
+		rs, err := p.replay.Rounds()
+		if err != nil {
+			return nil, err
+		}
+		w, err := rs.At(round).EndBoard()
+		if err != nil {
+			return nil, err
+		}
+		b, err := boardFromWire(w)
+		if err != nil {
+			return nil, err
+		}
+		return b, nil
 	}
 }
 

@@ -101,7 +101,7 @@ func serveGame(c context) {
 	}
 
 	// If we're here, they're looking for a single boards encoding
-	board := engine.NewPlayback(replay).Board(c.roundNumber())
+	board, err := engine.NewPlayback(replay).Board(c.roundNumber())
 	d, err := json.Marshal(board)
 	c.w.Write(d)
 }
@@ -139,8 +139,6 @@ func startMatch(c context) {
 	} else {
 		http.Redirect(c.w, c.r, "/game/"+string(gid), http.StatusFound)
 	}
-}
-func hackfight(c context) {
 }
 
 func loadBots(c context) {

@@ -16,7 +16,6 @@ angular.module('gobotApp', [])
 
   $.get(buildUrl(game.round), function(resp) {
     game.board = Gobot.GetBoard(resp)
-    debugger;
   });
   window.setTimeout(function() {
     game.round++;
