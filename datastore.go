@@ -298,6 +298,7 @@ func addReplayRound(orig botapi.Replay, round botapi.Replay_Round) (*capnp.Messa
 	if err := rounds.Set(rounds.Len()-1, round); err != nil {
 		return nil, err
 	}
+	newReplay.SetRounds(rounds)
 	return newMsg, nil
 }
 
