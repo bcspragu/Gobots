@@ -1,14 +1,12 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/bcspragu/Gobots/botapi"
 )
-
-// TODO: Fix the super inconsistent board API that alternates between taking in
-// *Robots and RobotIDs, it's gross
 
 const (
 	P1Faction = 1
@@ -22,6 +20,14 @@ const (
 	SelfDamage      = 1000 // Make them super dead
 )
 
+type CellType int
+
+const (
+	UnknownCellType CellType = iota
+	Invalid
+	Valid
+)
+
 type collisionMap map[Loc][]*Robot
 
 type LocPair struct {
@@ -30,6 +36,7 @@ type LocPair struct {
 }
 
 type Board struct {
+	Cells [][]CellType
 	Locs  map[Loc]*Robot
 	Size  Loc
 	Round int
@@ -80,10 +87,23 @@ func (j *JSONBoard) ToBoard() *Board {
 
 // EmptyBoard creates an empty board of the given size.
 func EmptyBoard(w, h int) *Board {
-	return &Board{
-		Locs: make(map[Loc]*Robot),
-		Size: Loc{w, h},
+	b := &Board{
+		Locs:  make(map[Loc]*Robot),
+		Size:  Loc{w, h},
+		Cells: make([][]CellType, w),
 	}
+
+	for i := 0; i < w; i++ {
+		b.Cells[i] = make([]CellType, h)
+	}
+
+	for x := 0; x < w; x++ {
+		for y := 0; y < h; y++ {
+			b.Cells[x][y] = b.cellType(x, y)
+		}
+	}
+
+	return b
 }
 
 func (b *Board) Width() int {
@@ -277,11 +297,25 @@ func (b *Board) clearTheDead() {
 	}
 }
 
-// TODO: Maybe make sure they're not teleporting across the board
-func (b *Board) moveBot(bot *Robot, loc Loc) {
+func (b *Board) moveBot(bot *Robot, loc Loc) error {
 	oldLoc := b.robotLoc(bot)
+	if manhattanDistance(oldLoc, loc) > 1 {
+		return errors.New("Teleporting or some ish")
+	}
 	delete(b.Locs, oldLoc)
 	b.Locs[loc] = bot
+	return nil
+}
+
+func manhattanDistance(loc1, loc2 Loc) int {
+	return abs(loc1.X-loc2.X) + abs(loc1.Y-loc2.Y)
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func (b *Board) nextLoc(bot *Robot, t botapi.Turn) Loc {
@@ -347,7 +381,8 @@ func (b *Board) AtXY(x, y int) *Robot {
 }
 
 func (b *Board) isValidLoc(loc Loc) bool {
-	return loc.X >= 0 && loc.X < b.Size.X && loc.Y >= 0 && loc.Y < b.Size.Y
+	return b.Cells[loc.X][loc.Y] == Valid
+	//return loc.X >= 0 && loc.X < b.Size.X && loc.Y >= 0 && loc.Y < b.Size.Y
 }
 
 // ToWire converts the board to the wire representation with respect to the
