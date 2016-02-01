@@ -3,6 +3,7 @@ package engine
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"strconv"
 
 	"github.com/bcspragu/Gobots/botapi"
@@ -18,9 +19,33 @@ const (
 	AttackDamage    = 2
 	DestructDamage  = 2
 	SelfDamage      = 1000 // Make them super dead
+
+	NewBotsSpacing = 5 // Number of rounds to wait before spawning new bots
 )
 
+type CellInfo struct {
+	Bot      *Robot
+	CellType CellType
+}
+
 type CellType int
+
+type SpawnFunc func(Loc) bool
+
+var all SpawnFunc = func(loc Loc) bool {
+	return true
+}
+
+var everyOther SpawnFunc = func(loc Loc) bool {
+	return loc.Y%2 == 0
+}
+
+var randomSpawnFuncGen = func(b *Board) SpawnFunc {
+	r := rand.Perm(b.Size.Y)
+	return func(loc Loc) bool {
+		return r[loc.Y]%2 == 0
+	}
+}
 
 const (
 	UnknownCellType CellType = iota
@@ -36,16 +61,23 @@ type LocPair struct {
 }
 
 type Board struct {
+	Locs map[Loc]*Robot
+
 	Cells [][]CellType
-	Locs  map[Loc]*Robot
 	Size  Loc
 	Round int
 
 	NextID RobotID
 }
 
+func (b *Board) CellsJS() [][]CellType {
+	return b.Cells
+}
+
 type JSONBoard struct {
 	Pairs []LocPair
+
+	Cells [][]CellType
 	Size  Loc
 	Round int
 
@@ -57,6 +89,7 @@ func (b *Board) ToJSONBoard() *JSONBoard {
 		Size:   b.Size,
 		Round:  b.Round,
 		NextID: b.NextID,
+		Cells:  b.Cells,
 	}
 
 	j.Pairs = make([]LocPair, len(b.Locs))
@@ -77,6 +110,7 @@ func (j *JSONBoard) ToBoard() *Board {
 		Size:   j.Size,
 		Round:  j.Round,
 		NextID: j.NextID,
+		Cells:  j.Cells,
 	}
 
 	for _, pair := range j.Pairs {
@@ -122,25 +156,30 @@ func (b *Board) newID() RobotID {
 // NewBoard creates an initialized game board for two factions.
 func NewBoard(w, h int) *Board {
 	b := EmptyBoard(w, h)
+	b.SpawnBots(everyOther)
+	return b
+}
 
+func (b *Board) SpawnBots(spawnFunc SpawnFunc) {
 	// Just line the ends with robots
-	for i := 1; i < h-1; i++ {
-		if i%2 == 0 {
-			continue
+	for i := 0; i < b.Size.Y; i++ {
+		la, lb := Loc{0, i}, Loc{b.Size.X - 1, i}
+		if b.isValidLoc(la) && spawnFunc(la) {
+			b.Locs[la] = &Robot{
+				ID:      b.newID(),
+				Health:  InitialHealth,
+				Faction: P1Faction,
+			}
 		}
-		la, lb := Loc{0, i}, Loc{w - 1, i}
-		b.Locs[la] = &Robot{
-			ID:      b.newID(),
-			Health:  InitialHealth,
-			Faction: P1Faction,
-		}
-		b.Locs[lb] = &Robot{
-			ID:      b.newID(),
-			Health:  InitialHealth,
-			Faction: P2Faction,
+
+		if b.isValidLoc(lb) && spawnFunc(lb) {
+			b.Locs[lb] = &Robot{
+				ID:      b.newID(),
+				Health:  InitialHealth,
+				Faction: P2Faction,
+			}
 		}
 	}
-	return b
 }
 
 func (b *Board) Update(ta, tb botapi.Turn_List) {
@@ -155,12 +194,13 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 		// If there's only one bot trying to get somewhere, just move them there
 		if len(bots) == 1 {
 			b.moveBot(bots[0], loc)
+		} else {
+			// Multiple bots, hurt 'em
+			for _, bot := range bots {
+				b.hurtBot(bot, CollisionDamage)
+			}
 		}
 
-		// Multiple bots, hurt 'em
-		for _, bot := range bots {
-			b.hurtBot(bot, CollisionDamage)
-		}
 	}
 	// Get rid of anyone who died in a collision
 	b.clearTheDead()
@@ -187,6 +227,10 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 	b.clearTheDead()
 
 	b.Round++
+
+	if b.Round%NewBotsSpacing == 0 {
+		b.SpawnBots(randomSpawnFuncGen(b))
+	}
 }
 
 func (b *Board) issueAttacks(ts botapi.Turn_List) {
@@ -372,17 +416,22 @@ func (b *Board) IsFinished() bool {
 }
 
 // At returns the robot at a location or nil if not found.
-func (b *Board) AtXY(x, y int) *Robot {
+func (b *Board) AtXY(x, y int) CellInfo {
 	if !b.isValidLoc(Loc{x, y}) {
-		// TODO: Is panic the right thing to do here?
-		panic("location out of bounds")
+		return CellInfo{
+			Bot:      nil,
+			CellType: b.Cells[x][y],
+		}
+
 	}
-	return b.Locs[Loc{X: x, Y: y}]
+	return CellInfo{
+		Bot:      b.Locs[Loc{X: x, Y: y}],
+		CellType: b.Cells[x][y],
+	}
 }
 
 func (b *Board) isValidLoc(loc Loc) bool {
 	return b.Cells[loc.X][loc.Y] == Valid
-	//return loc.X >= 0 && loc.X < b.Size.X && loc.Y >= 0 && loc.Y < b.Size.Y
 }
 
 // ToWire converts the board to the wire representation with respect to the

@@ -26,7 +26,7 @@ angular.module('gobotApp', [])
     if (game.round >= 99) {
       window.clearInterval(id)
     }
-  }, 1000);
+  }, 250);
 })
 .config(function($interpolateProvider) {
   $interpolateProvider.startSymbol('[[');

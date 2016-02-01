@@ -36,8 +36,8 @@
     flex: 1;
 }
 
-.cell.gopher {
-  background: red;
+.cell.invalid {
+  background: grey;
 }
 
 * {
@@ -54,7 +54,11 @@ body {
     line-height: 1.7em;
     color: #7f8c8d;
     font-size: 13px;
-    background: #1f8dd6;
+    background: #176aa1;
+}
+
+.vs {
+  margin: 0 20px;
 }
 
 h1,
@@ -138,14 +142,9 @@ a.pure-button-primary {
     text-align: center;
     box-shadow: 0 1px 1px rgba(0,0,0, 0.10);
 }
+
 .home-menu {
     background: #2d3e50;
-}
-.pure-menu.pure-menu-fixed {
-    /* Fixed menus normally have a border at the bottom. */
-    border-bottom: none;
-    /* I need a higher z-index here because of the scroll-over effect. */
-    z-index: 4;
 }
 
 .home-menu .pure-menu-heading {
@@ -154,7 +153,15 @@ a.pure-button-primary {
     font-size: 120%;
 }
 
-.home-menu .pure-menu-selected a {
+.token-btn {
+  font-size: 110%;
+}
+
+.home-menu .pure-menu-link:hover {
+  background: transparent;
+}
+
+.home-menu .pure-menu-selected a, .home-menu .pure-menu-selected a:visited{
     color: white;
 }
 
@@ -168,6 +175,10 @@ a.pure-button-primary {
     color: #AECFE5;
 }
 
+.fight-btn {
+  margin-top: 10px;
+}
+
 
 /*
  * -- SPLASH STYLES --
@@ -175,21 +186,14 @@ a.pure-button-primary {
  */
 
 .splash {
-    width: 80%;
-    height: 50%;
+    width: 50%;
     margin: auto;
-    position: absolute;
-    top: -250px; left: 0; bottom: 0; right: 0;
     text-align: center;
-    text-transform: uppercase;
 }
-    .ai-token{
-      text-transform: none;
-    }
 
 /* This is the main heading that appears on the blue section */
 .splash-head {
-    font-size: 20px;
+    font-size: 48px;
     font-weight: bold;
     color: white;
     border: 3px solid white;
@@ -204,8 +208,12 @@ a.pure-button-primary {
     color: white;
     letter-spacing: 0.05em;
     opacity: 0.8;
+    text-transform: uppercase;
 }
 
+.splash-subhead.ai-token {
+  text-transform: none;
+}
 /*
  * -- TABLET (AND UP) MEDIA QUERIES --
  * On tablets and other medium-sized devices, we want to customize some
@@ -227,25 +235,13 @@ a.pure-button-primary {
     .home-menu {
         text-align: left;
     }
-        .home-menu ul {
-            float: right;
-        }
 
-    /* We increase the height of the splash-container */
-/*    .splash-container {
-        height: 500px;
-    }*/
+    .home-menu ul {
+        float: right;
+    }
 
     /* We decrease the width of the .splash, since we have more width
     to work with */
-    .splash {
-        width: 50%;
-        height: 50%;
-    }
-
-    .splash-head {
-        font-size: 250%;
-    }
 
 
     /* We remove the border-separator assigned to .l-box-lrg */
@@ -253,16 +249,4 @@ a.pure-button-primary {
         border: none;
     }
 
-}
-
-/*
- * -- DESKTOP (AND UP) MEDIA QUERIES --
- * On desktops and other large devices, we want to over-ride some
- * of the mobile and tablet styles.
- */
-@media (min-width: 78em) {
-    /* We increase the header font size even more */
-    .splash-head {
-        font-size: 300%;
-    }
 }

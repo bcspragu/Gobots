@@ -21,6 +21,10 @@ type aiEndpoint struct {
 	online map[aiID]botapi.Ai
 }
 
+const (
+	BoardSize = 20
+)
+
 func startAIEndpoint(addr string, ds datastore) (*aiEndpoint, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -116,7 +120,7 @@ func (aic *aiConnector) drop() {
 
 func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB *onlineAI) error {
 	// Create new board and store it.
-	b := engine.NewBoard(10, 10)
+	b := engine.NewBoard(BoardSize, BoardSize)
 	_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
 	wb, _ := botapi.NewRootBoard(seg)
 	b.ToWire(wb, engine.P1Faction)
