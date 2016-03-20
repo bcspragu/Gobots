@@ -3,7 +3,7 @@ using Go = import "../../../../zombiezen.com/go/capnproto2/go.capnp";
 @0x834c2fcbeb96c6bd;
 
 $Go.package("botapi");
-$Go.import("github.com/gophergala2016/Gobots/botapi");
+$Go.import("github.com/bcspragu/Gobots/botapi");
 
 using RobotId = UInt32;
 
@@ -74,6 +74,8 @@ struct Turn {
 
     selfDestruct @4 :Void;
     # Does damage to all surrounding bots (even diagonals).
+
+    guard @5 :Void;
   }
 }
 

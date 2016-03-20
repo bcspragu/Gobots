@@ -1,0 +1,4 @@
+-Move 3rd party things to third_party
+-Handle disconnect error cases better
+-Add an even easier AI package
+-Add in support for guard, functions like RobotGame in Python
