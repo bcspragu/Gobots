@@ -54,7 +54,6 @@ func initDB(dbName string) (datastore, error) {
 }
 
 // userID is just the user's GitHub API access token. Let's hope it's unique
-// enough #YOLO
 type userID string
 
 type aiID string

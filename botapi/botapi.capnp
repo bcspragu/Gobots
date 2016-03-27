@@ -19,6 +19,7 @@ struct ConnectRequest {
 
 struct Credentials {
   secretToken @0 :Text;
+  botName @1 :Text;
 }
 
 interface Ai {

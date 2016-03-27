@@ -1,8 +1,12 @@
-// Package easyai provides an idiomatic Go wrapper around the bot API.
-package easyai
+// Package game provides an idiomatic Go wrapper around the bot API.
+package game
 
 import (
+	"fmt"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/bcspragu/Gobots/botapi"
 	"golang.org/x/net/context"
@@ -55,7 +59,7 @@ const (
 
 // An AI is an algorithm that makes moves for a particular game.
 type AI interface {
-	RobotTick(board *Board, r *Robot) Turn
+	Act(board *Board, r *Robot) Action
 }
 
 // Loc is a coordinate pair.
@@ -91,13 +95,13 @@ func Distance(a, b Loc) int {
 	return dx + dy
 }
 
-// A Turn represents what a robot will do.  The zero value waits the turn.
-type Turn struct {
-	Kind      TurnKind
+// A Action represents what a robot will do.  The zero value waits the turn.
+type Action struct {
+	Kind      ActionKind
 	Direction Direction
 }
 
-func (t Turn) toWire(id uint32, wire botapi.Turn) {
+func (t Action) toWire(id uint32, wire botapi.Turn) {
 	wire.SetId(id)
 	switch t.Kind {
 	case Wait:
@@ -111,12 +115,12 @@ func (t Turn) toWire(id uint32, wire botapi.Turn) {
 	}
 }
 
-// TurnKind is an enumeration of the kinds of turns.
-type TurnKind int
+// ActionKing is an enumeration of the kinds of turns.
+type ActionKind int
 
 // Kinds of turns.
 const (
-	Wait TurnKind = iota
+	Wait ActionKind = iota
 	Move
 	Attack
 	SelfDestruct
@@ -163,13 +167,17 @@ func (c *Client) Close() error {
 
 // RegisterAI adds an AI implementation for the token given by the website.
 // The AI factory function will be called for each new game encountered.
-func (c *Client) RegisterAI(token string, factory Factory) error {
+func (c *Client) RegisterAI(name, token string, factory Factory) error {
 	a := botapi.Ai_ServerToClient(&aiAdapter{
 		factory: factory,
 		games:   make(map[string]AI),
 	})
 	_, err := c.connector.Connect(context.TODO(), func(r botapi.ConnectRequest) error {
 		creds, err := r.NewCredentials()
+		if err != nil {
+			return err
+		}
+		err = creds.SetBotName(name)
 		if err != nil {
 			return err
 		}
@@ -221,7 +229,7 @@ func (a *aiAdapter) TakeTurn(call botapi.Ai_takeTurn) error {
 		return err
 	}
 	for i, r := range robots {
-		t := ai.RobotTick(b, r)
+		t := ai.Act(b, r)
 		t.toWire(r.ID, turns.At(i))
 	}
 	call.Results.SetTurns(turns)
@@ -263,4 +271,31 @@ func convertBoard(wire botapi.Board) (b *Board, playerBots []*Robot, err error) 
 		Round: int(wire.Round()),
 		Cells: rows,
 	}, playerBots, nil
+}
+
+const (
+	exitFail  = 1
+	exitUsage = 64
+)
+
+func StartRobotServer(name, token string, factory Factory) {
+	c, err := Dial("http://gobotgame.com:8001")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "dial:", err)
+		os.Exit(exitFail)
+	}
+	if err = c.RegisterAI(name, token, factory); err != nil {
+		fmt.Fprintln(os.Stderr, "register:", err)
+		os.Exit(exitFail)
+	}
+	fmt.Fprintf(os.Stderr, "Connected bot %s. Ctrl-C or send SIGINT to disconnect.", name)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGQUIT)
+	<-sig
+	signal.Stop(sig)
+	fmt.Fprintln(os.Stderr, "Interrupted. Quitting...")
+	if err := c.Close(); err != nil {
+		fmt.Fprintln(os.Stderr, "close:", err)
+		os.Exit(exitFail)
+	}
 }

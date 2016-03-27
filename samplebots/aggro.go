@@ -1,29 +1,29 @@
 package main
 
-import "github.com/bcspragu/Gobots/easyai"
+import "github.com/bcspragu/Gobots/game"
 
 type aggro struct{}
 
-func (aggro) RobotTick(b *easyai.Board, r *easyai.Robot) easyai.Turn {
-	ds := []easyai.Direction{
-		easyai.North,
-		easyai.South,
-		easyai.East,
-		easyai.West,
+func (aggro) Action(b *game.Board, r *game.Robot) game.Turn {
+	ds := []game.Direction{
+		game.North,
+		game.South,
+		game.East,
+		game.West,
 	}
 	for _, d := range ds {
 		loc := r.Loc.Add(d)
 		if opponentAt(b, loc) {
-			return easyai.Turn{
-				Kind:      easyai.Attack,
+			return game.Turn{
+				Kind:      game.Attack,
 				Direction: d,
 			}
 		}
 	}
-	return easyai.Turn{Kind: easyai.Wait}
+	return game.Turn{Kind: game.Wait}
 }
 
-func opponentAt(b *easyai.Board, loc easyai.Loc) bool {
+func opponentAt(b *game.Board, loc game.Loc) bool {
 	if !b.IsInside(loc) {
 		return false
 	}
@@ -31,5 +31,5 @@ func opponentAt(b *easyai.Board, loc easyai.Loc) bool {
 	if r == nil {
 		return false
 	}
-	return r.Faction == easyai.OpponentFaction
+	return r.Faction == game.OpponentFaction
 }

@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/bcspragu/Gobots/easyai"
+	"github.com/bcspragu/Gobots/game"
 )
 
 var (
@@ -21,11 +21,11 @@ const (
 	exitUsage = 64
 )
 
-var bots = map[string]easyai.Factory{
-	"aggro": func(gameID string) easyai.AI {
+var bots = map[string]game.Factory{
+	"aggro": func(gameID string) game.AI {
 		return aggro{}
 	},
-	"pathfinder": func(gameID string) easyai.AI {
+	"pathfinder": func(gameID string) game.AI {
 		return new(pathfinder)
 	},
 }
@@ -49,7 +49,7 @@ func main() {
 		os.Exit(exitUsage)
 	}
 
-	c, err := easyai.Dial(*serverAddress)
+	c, err := game.Dial(*serverAddress)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "samplebots: dial:", err)
 		os.Exit(exitFail)

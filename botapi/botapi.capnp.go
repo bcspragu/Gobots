@@ -240,7 +240,7 @@ func (p ConnectRequest_Promise) Ai() Ai {
 type Credentials struct{ capnp.Struct }
 
 func NewCredentials(s *capnp.Segment) (Credentials, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
 	if err != nil {
 		return Credentials{}, err
 	}
@@ -248,7 +248,7 @@ func NewCredentials(s *capnp.Segment) (Credentials, error) {
 }
 
 func NewRootCredentials(s *capnp.Segment) (Credentials, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
 	if err != nil {
 		return Credentials{}, err
 	}
@@ -279,7 +279,9 @@ func (s Credentials) SecretTokenBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return capnp.ToData(p), nil
+
 }
 
 func (s Credentials) SetSecretToken(v string) error {
@@ -291,12 +293,41 @@ func (s Credentials) SetSecretToken(v string) error {
 	return s.Struct.SetPointer(0, t)
 }
 
+func (s Credentials) BotName() (string, error) {
+	p, err := s.Struct.Pointer(1)
+	if err != nil {
+		return "", err
+	}
+
+	return capnp.ToText(p), nil
+
+}
+
+func (s Credentials) BotNameBytes() ([]byte, error) {
+	p, err := s.Struct.Pointer(1)
+	if err != nil {
+		return nil, err
+	}
+
+	return capnp.ToData(p), nil
+
+}
+
+func (s Credentials) SetBotName(v string) error {
+
+	t, err := capnp.NewText(s.Struct.Segment(), v)
+	if err != nil {
+		return err
+	}
+	return s.Struct.SetPointer(1, t)
+}
+
 // Credentials_List is a list of Credentials.
 type Credentials_List struct{ capnp.List }
 
 // NewCredentials creates a new list of Credentials.
 func NewCredentials_List(s *capnp.Segment, sz int32) (Credentials_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
 	if err != nil {
 		return Credentials_List{}, err
 	}
@@ -576,7 +607,9 @@ func (s Board) GameIdBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return capnp.ToData(p), nil
+
 }
 
 func (s Board) SetGameId(v string) error {
@@ -791,7 +824,9 @@ func (s Replay) GameIdBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return capnp.ToData(p), nil
+
 }
 
 func (s Replay) SetGameId(v string) error {
@@ -1035,10 +1070,11 @@ const (
 	Turn_Which_move         Turn_Which = 1
 	Turn_Which_attack       Turn_Which = 2
 	Turn_Which_selfDestruct Turn_Which = 3
+	Turn_Which_guard        Turn_Which = 4
 )
 
 func (w Turn_Which) String() string {
-	const s = "waitmoveattackselfDestruct"
+	const s = "waitmoveattackselfDestructguard"
 	switch w {
 	case Turn_Which_wait:
 		return s[0:4]
@@ -1048,6 +1084,8 @@ func (w Turn_Which) String() string {
 		return s[8:14]
 	case Turn_Which_selfDestruct:
 		return s[14:26]
+	case Turn_Which_guard:
+		return s[26:31]
 
 	}
 	return "Turn_Which(" + strconv.FormatUint(uint64(w), 10) + ")"
@@ -1115,6 +1153,10 @@ func (s Turn) SetAttack(v Direction) {
 
 func (s Turn) SetSelfDestruct() {
 	s.Struct.SetUint16(0, 3)
+}
+
+func (s Turn) SetGuard() {
+	s.Struct.SetUint16(0, 4)
 }
 
 // Turn_List is a list of Turn.

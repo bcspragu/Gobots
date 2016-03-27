@@ -78,7 +78,7 @@ func (e *aiEndpoint) listOnlineAIs() []onlineAI {
 }
 
 // connect adds an online AI, given the secret auth token.
-func (e *aiEndpoint) connect(token string, ai botapi.Ai) (aiID, error) {
+func (e *aiEndpoint) connect(name, token string, ai botapi.Ai) (aiID, error) {
 	info, err := e.ds.lookupAIToken(token)
 	if err != nil {
 		return "", err
@@ -106,7 +106,8 @@ type aiConnector struct {
 func (aic *aiConnector) Connect(call botapi.AiConnector_connect) error {
 	creds, _ := call.Params.Credentials()
 	tok, _ := creds.SecretToken()
-	id, err := aic.e.connect(tok, call.Params.Ai())
+	name, _ := creds.BotName()
+	id, err := aic.e.connect(name, tok, call.Params.Ai())
 	if err != nil {
 		return err
 	}

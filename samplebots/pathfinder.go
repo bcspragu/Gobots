@@ -1,24 +1,24 @@
 package main
 
-import "github.com/bcspragu/Gobots/easyai"
+import "github.com/bcspragu/Gobots/game"
 
 type pathfinder struct {
 	targets map[uint32]uint32
 }
 
-func (pf *pathfinder) RobotTick(b *easyai.Board, r *easyai.Robot) easyai.Turn {
+func (pf *pathfinder) Action(b *game.Board, r *game.Robot) game.Turn {
 	// Immediate surrounding attacks
-	ds := []easyai.Direction{
-		easyai.North,
-		easyai.South,
-		easyai.East,
-		easyai.West,
+	ds := []game.Direction{
+		game.North,
+		game.South,
+		game.East,
+		game.West,
 	}
 	for _, d := range ds {
 		loc := r.Loc.Add(d)
 		if opponentAt(b, loc) {
-			return easyai.Turn{
-				Kind:      easyai.Attack,
+			return game.Turn{
+				Kind:      game.Attack,
 				Direction: d,
 			}
 		}
@@ -26,9 +26,9 @@ func (pf *pathfinder) RobotTick(b *easyai.Board, r *easyai.Robot) easyai.Turn {
 
 	// Acquire target
 	tgt, ok := pf.targets[r.ID]
-	var opp *easyai.Robot
+	var opp *game.Robot
 	if ok {
-		opp = b.Find(func(q *easyai.Robot) bool {
+		opp = b.Find(func(q *game.Robot) bool {
 			return q.ID == tgt
 		})
 	}
@@ -38,7 +38,7 @@ func (pf *pathfinder) RobotTick(b *easyai.Board, r *easyai.Robot) easyai.Turn {
 		}
 		opp = nearestOpponent(b, r.Loc)
 		if opp == nil {
-			return easyai.Turn{Kind: easyai.Wait}
+			return game.Turn{Kind: game.Wait}
 		}
 		pf.targets[r.ID] = opp.ID
 	}
@@ -49,41 +49,41 @@ func (pf *pathfinder) RobotTick(b *easyai.Board, r *easyai.Robot) easyai.Turn {
 	// TODO: and why don't you compute the vector angle?
 	switch {
 	case opp.Loc.X < r.Loc.X:
-		return easyai.Turn{
-			Kind:      easyai.Move,
-			Direction: easyai.West,
+		return game.Turn{
+			Kind:      game.Move,
+			Direction: game.West,
 		}
 	case opp.Loc.X > r.Loc.X:
-		return easyai.Turn{
-			Kind:      easyai.Move,
-			Direction: easyai.East,
+		return game.Turn{
+			Kind:      game.Move,
+			Direction: game.East,
 		}
 	case opp.Loc.Y < r.Loc.Y:
-		return easyai.Turn{
-			Kind:      easyai.Move,
-			Direction: easyai.North,
+		return game.Turn{
+			Kind:      game.Move,
+			Direction: game.North,
 		}
 	case opp.Loc.Y > r.Loc.Y:
-		return easyai.Turn{
-			Kind:      easyai.Move,
-			Direction: easyai.South,
+		return game.Turn{
+			Kind:      game.Move,
+			Direction: game.South,
 		}
 	}
 	// TODO: impossibru?
-	return easyai.Turn{Kind: easyai.Wait}
+	return game.Turn{Kind: game.Wait}
 }
 
-func nearestOpponent(b *easyai.Board, loc easyai.Loc) *easyai.Robot {
+func nearestOpponent(b *game.Board, loc game.Loc) *game.Robot {
 	// Probably faster ways of doing this.. traversing outward
-	var closest *easyai.Robot
+	var closest *game.Robot
 	var closestDist int
 	for y, row := range b.Cells {
 		for x, r := range row {
-			curr := easyai.Loc{x, y}
-			if r == nil || r.Faction != easyai.OpponentFaction {
+			curr := game.Loc{x, y}
+			if r == nil || r.Faction != game.OpponentFaction {
 				continue
 			}
-			d := easyai.Distance(loc, curr)
+			d := game.Distance(loc, curr)
 			if closest == nil || d < closestDist {
 				closest, closestDist = r, d
 			}
