@@ -4,13 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
-	"strings"
 
 	gocontext "golang.org/x/net/context"
 
@@ -24,7 +20,6 @@ var (
 	templates = tmpl{template.Must(template.ParseGlob("templates/*.html"))}
 
 	db               datastore
-	secretz          string
 	s                *securecookie.SecureCookie
 	globalAIEndpoint *aiEndpoint
 )
@@ -41,18 +36,12 @@ func main() {
 		log.Fatal("Couldn't open the database, SHUT IT DOWN")
 	}
 
-	if secretz, err = initSecretz(); err != nil {
-		log.Fatal("Ain't got no GitHub client secret!!")
-	}
-
 	if s, err = initKeys(); err != nil {
 		log.Fatal("Can't encrypt the cookies! WHATEVER WILL WE DO")
 	}
 
 	http.HandleFunc("/", withLogin(serveIndex))
 	http.HandleFunc("/game/", withLogin(serveGame))
-	http.HandleFunc("/auth", withLogin(serveAuth))
-	http.HandleFunc("/loadBots", withLogin(loadBots))
 	http.HandleFunc("/startMatch", withLogin(startMatch))
 
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
@@ -147,57 +136,25 @@ func startMatch(c context) {
 	}
 }
 
-func loadBots(c context) {
-	uid := userID(c.p.Name)
-	_, token, err := db.createAI(uid, &aiInfo{Nick: c.r.PostFormValue("nick")})
-	if err != nil {
-		serveError(c.w, err)
-		return
-	}
-	fmt.Fprintln(c.w, "Congrats, your token is:", token)
+// TODO: Make this happen on successful connection
+func createAI(name, token string) error {
+	_, err := db.createAI(&aiInfo{
+		Name:  name,
+		Token: accessToken(token),
+	})
+	return err
 }
 
-func serveAuth(c context) {
-	if c.r.FormValue("state") != c.magicToken {
-		log.Println("They're spoofing GitHub's API. I AM THE ONE WHO KNOCKS (on GitHub's API server)")
-		return
-	}
-
-	resp, err := http.PostForm("https://github.com/login/oauth/access_token", url.Values{
-		"client_id":     {clientId},
-		"client_secret": {secretz},
-		"code":          {c.r.FormValue("code")},
+// TODO: Create user properly
+func createUser(c context) {
+	token := genName(25)
+	go db.createUser(userInfo{
+		Name:  "Dude", // TODO: Take name
+		Token: accessToken(token),
 	})
-	if err != nil {
-		log.Println(err)
-		return
-	}
 
-	defer resp.Body.Close()
-
-	d, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	sRep := string(d)
-	// http://i.imgur.com/c4jt321.png
-	is, ie := strings.Index(sRep, "=")+1, strings.Index(sRep, "&")
-	accessToken := sRep[is:ie]
-
-	nutFact, err := loadCookie(c.r)
-	if err != nil {
-		log.Println(err)
-		// This is weird, they must have cookies off, which makes it hard for us to
-		// validate them. Screw 'em for now
-		return
-	}
-
-	// Set their access token to what we just got, and create a user with that token
-	if nutFact.AccessToken == "" {
-		nutFact.AccessToken = accessToken
-		go db.createUser(userID(accessToken))
+	nutFact := nutritionFacts{
+		AccessToken: token,
 	}
 
 	if encoded, err := s.Encode("info", nutFact); err == nil {
@@ -210,26 +167,4 @@ func serveAuth(c context) {
 	}
 
 	http.Redirect(c.w, c.r, "/", http.StatusFound)
-}
-
-func username(uID userID) string {
-	resp, err := http.Get("https://api.github.com/user?access_token=" + string(uID))
-	if err != nil {
-		return ""
-	}
-
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return ""
-	}
-
-	var data map[string]interface{}
-	if err := json.Unmarshal(b, &data); err != nil {
-		log.Println(err)
-		return ""
-	}
-
-	return data["login"].(string)
 }

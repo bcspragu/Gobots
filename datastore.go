@@ -15,14 +15,13 @@ import (
 
 type datastore interface {
 	// Users
-	createUser(u userID) error
-	loadUser(u userID) (*player, error)
+	createUser(u userInfo) error
+	loadUser(a accessToken) (*userInfo, error)
 
 	// AIs
-	createAI(u userID, info *aiInfo) (id aiID, token string, err error)
-	listAIsForUser(u userID) ([]*aiInfo, error)
+	createAI(info *aiInfo) (id aiID, err error)
+	listAIsForUser(a accessToken) ([]*aiInfo, error)
 	lookupAI(id aiID) (*aiInfo, error)
-	lookupAIToken(token string) (*aiInfo, error)
 
 	// Games
 	startGame(ai1, ai2 aiID, init botapi.Board) (gameID, error)
@@ -41,7 +40,7 @@ func initDB(dbName string) (datastore, error) {
 	}
 
 	err = db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{UserBucket, GameBucket, AIBucket, TokensBucket} {
+		for _, b := range [][]byte{UserBucket, GameBucket, AIBucket} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -53,66 +52,63 @@ func initDB(dbName string) (datastore, error) {
 	return &dbImpl{db}, err
 }
 
-// userID is just the user's GitHub API access token. Let's hope it's unique
-type userID string
+type accessToken string
 
 type aiID string
 
 type gameID string
 
+type userInfo struct {
+	Name  string
+	Token accessToken
+}
+
 type aiInfo struct {
 	ID    aiID
-	Nick  string
-	Owner userID
-	Token string
+	Name  string
+	Token accessToken // Owner's access token
 
-	wins   int
-	losses int
+	Wins   int
+	Losses int
 }
 
 var (
-	UserBucket   = []byte("Users")
-	GameBucket   = []byte("Games")
-	AIBucket     = []byte("AI")
-	TokensBucket = []byte("AISecretToken")
+	UserBucket = []byte("Users")
+	GameBucket = []byte("Games")
+	AIBucket   = []byte("AI")
 )
 
-func (db *dbImpl) createUser(uID userID) error {
-	u := username(uID)
-	p := player{
-		Name: u,
-	}
-
+func (db *dbImpl) createUser(uInfo userInfo) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		var buf bytes.Buffer
 		enc := gob.NewEncoder(&buf)
 
-		if err := enc.Encode(p); err != nil {
+		if err := enc.Encode(uInfo); err != nil {
 			return err
 		}
 
 		b := tx.Bucket(UserBucket)
-		return b.Put([]byte(uID), buf.Bytes())
+		return b.Put([]byte(uInfo.Token), buf.Bytes())
 	})
 }
 
-func (db *dbImpl) loadUser(uID userID) (*player, error) {
-	var p *player
+func (db *dbImpl) loadUser(a accessToken) (*userInfo, error) {
+	var u *userInfo
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(UserBucket)
-		dat := b.Get([]byte(uID))
+		dat := b.Get([]byte(a))
 
 		buf := bytes.NewReader(dat)
 		dec := gob.NewDecoder(buf)
 
-		return dec.Decode(&p)
+		return dec.Decode(&u)
 	})
 
-	return p, err
+	return u, err
 }
 
 // AIs
-func (db *dbImpl) createAI(u userID, info *aiInfo) (id aiID, token string, err error) {
+func (db *dbImpl) createAI(info *aiInfo) (id aiID, err error) {
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(AIBucket)
 		idNum, err := b.NextSequence()
@@ -120,32 +116,23 @@ func (db *dbImpl) createAI(u userID, info *aiInfo) (id aiID, token string, err e
 			return err
 		}
 		id = aiID(strconv.FormatUint(idNum, 10))
-		token = genName(32)
 		newInfo := &aiInfo{
 			ID:    id,
-			Nick:  info.Nick,
-			Token: token,
-			Owner: u,
+			Name:  info.Name,
+			Token: info.Token,
 		}
 		var buf bytes.Buffer
 		if err := gob.NewEncoder(&buf).Encode(newInfo); err != nil {
 			return err
 		}
-		if err := b.Put([]byte(id), buf.Bytes()); err != nil {
-			return err
-		}
-
-		tb := tx.Bucket(TokensBucket)
-		if err := tb.Put([]byte(token), []byte(id)); err != nil {
-			return err
-		}
-
-		return nil
+		return b.Put([]byte(id), buf.Bytes())
 	})
 	return
 }
 
-func (db *dbImpl) listAIsForUser(u userID) ([]*aiInfo, error) {
+// TODO: Instead of iterating through all of the AIs looking for ones owned by
+// this person, find something better
+func (db *dbImpl) listAIsForUser(a accessToken) ([]*aiInfo, error) {
 	var result []*aiInfo
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(AIBucket)
@@ -158,7 +145,7 @@ func (db *dbImpl) listAIsForUser(u userID) ([]*aiInfo, error) {
 			if err := gob.NewDecoder(bytes.NewReader(v)).Decode(info); err != nil {
 				continue
 			}
-			if info.Owner == u {
+			if info.Token == a {
 				result = append(result, info)
 			}
 		}
@@ -172,27 +159,6 @@ func (db *dbImpl) lookupAI(id aiID) (*aiInfo, error) {
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(AIBucket)
 		dat := b.Get([]byte(id))
-		if len(dat) == 0 {
-			return errDatastoreNotFound
-		}
-
-		buf := bytes.NewReader(dat)
-		return gob.NewDecoder(buf).Decode(&info)
-	})
-	return info, err
-}
-
-func (db *dbImpl) lookupAIToken(token string) (*aiInfo, error) {
-	var info *aiInfo
-	err := db.View(func(tx *bolt.Tx) error {
-		tb := tx.Bucket(TokensBucket)
-		idBytes := tb.Get([]byte(token))
-		if len(idBytes) == 0 {
-			return errDatastoreNotFound
-		}
-
-		b := tx.Bucket(AIBucket)
-		dat := b.Get(idBytes)
 		if len(dat) == 0 {
 			return errDatastoreNotFound
 		}
@@ -217,7 +183,11 @@ func (db *dbImpl) startGame(ai1, ai2 aiID, init botapi.Board) (gameID, error) {
 		if err != nil {
 			return err
 		}
-		gID = newGameID(b)
+		idNum, err := b.NextSequence()
+		if err != nil {
+			return err
+		}
+		gID = gameID(strconv.FormatUint(idNum, 10))
 		r.SetGameId(string(gID))
 		r.SetInitialBoard(init)
 
@@ -329,13 +299,3 @@ func copyBytes(b []byte) []byte {
 
 var errDatastoreNotImplemented = errors.New("gobots: datastore operation not implemented")
 var errDatastoreNotFound = errors.New("gobots: datastore entity not found")
-
-// NOTE: Definitely definitely only call this from inside a transaction
-func newGameID(b *bolt.Bucket) gameID {
-	id, err := b.NextSequence()
-	if err != nil {
-		// Screw it, they're getting a random ID
-		return gameID(genName(64))
-	}
-	return gameID(strconv.FormatUint(id, 16))
-}

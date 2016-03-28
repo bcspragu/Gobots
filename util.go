@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/securecookie"
 )
@@ -14,8 +13,7 @@ import (
 // I was going to call it cookieData, but data about a cookie is just the
 // nutrition facts #HowDidIGetAProfessionalCodingJob
 type nutritionFacts struct {
-	MagicRandomness string
-	AccessToken     string
+	AccessToken string
 }
 
 func withLogin(handler func(c context)) func(w http.ResponseWriter, r *http.Request) {
@@ -24,27 +22,15 @@ func withLogin(handler func(c context)) func(w http.ResponseWriter, r *http.Requ
 
 		// Do some best-effort context-filling
 		if nutFact, err := loadCookie(r); err == nil {
-			c.magicToken = nutFact.MagicRandomness
+			c.token = accessToken(nutFact.AccessToken)
 			if nutFact.AccessToken != "" {
-				if p, err := db.loadUser(userID(nutFact.AccessToken)); err == nil {
-					c.p = p
+				if u, err := db.loadUser(accessToken(nutFact.AccessToken)); err == nil {
+					c.u = u
 				}
 			}
 		} else {
-			// They don't have a cookie from us yet. Let's fix that
-			r := genName(128)
-			val := nutritionFacts{
-				MagicRandomness: r,
-			}
-			if encoded, err := s.Encode("info", val); err == nil {
-				cookie := &http.Cookie{
-					Name:  "info",
-					Value: encoded,
-					Path:  "/",
-				}
-				http.SetCookie(w, cookie)
-				c.magicToken = r
-			}
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
 		}
 		handler(c)
 	}
@@ -59,14 +45,6 @@ func genName(n int) string {
 		b[i] = letters[r.Intn(len(letters))]
 	}
 	return string(b)
-}
-
-func initSecretz() (string, error) {
-	if dat, err := ioutil.ReadFile("secretz"); err == nil {
-		return strings.TrimSpace(string(dat)), nil
-	} else {
-		return "", err
-	}
 }
 
 func initKeys() (*securecookie.SecureCookie, error) {

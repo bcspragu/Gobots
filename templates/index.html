@@ -2,13 +2,13 @@
   <h1 class="splash-head">Welcome to Gobots</h1>
   {{if not .Player}}
     <p>
-      <a href="https://github.com/login/oauth/authorize?client_id={{.ClientID}}&redirect_uri={{.RedirectUri}}&state={{.Random}}" class="pure-button pure-button-primary">Sign in with GitHub</a>
+      Create an account
     </p>
   {{end}}
   <h2 class="splash-subhead">Bots Online</h2>
   {{ if .Data.Bots }}
     {{ range $bot := .Data.Bots }}
-      <div class="bots">{{ $bot.Info.Nick }}</div>
+      <div class="bots">{{ $bot.Info.Name }}</div>
     {{ end }}
   {{ else }}
     <div>No bots are currently registered.</div>
@@ -18,26 +18,16 @@
     <form class="pure-form fight-bot" method="POST" action="/startMatch">
         <select name="ai1">
           {{ range $bot := .Data.Bots }}
-            <option value="{{ $bot.Info.ID }}">{{ $bot.Info.Nick }}</option>
+            <option value="{{ $bot.Info.ID }}">{{ $bot.Info.Name }}</option>
           {{ end }}
         </select>
         <span class="vs">vs</span>
         <select name="ai2">
           {{ range $bot := .Data.Bots }}
-            <option value="{{ $bot.Info.ID }}">{{ $bot.Info.Nick }}</option>
+            <option value="{{ $bot.Info.ID }}">{{ $bot.Info.Name }}</option>
           {{ end }}
         </select>
         <div><button type="submit" class="pure-button pure-button-primary fight-btn">Fight</button></div>
     </form>
-  {{ end }}
-
-  {{if .Player}}
-    <h2 class="splash-subhead">Add Bots</h2>
-    <form class="pure-form add-bot" method="POST" action="/loadBots">
-      <div class="pure-g">
-        <div class="pure-u-4-5"><input type="text" placeholder="Bot Nickname" name="nick" id="nick"></div>
-        <div class="pure-u-1-5"><button type="submit" class="pure-button pure-button-primary token-btn">Get Token</button></div>
-    </form>
-    <div class="splash-subhead ai-token"></div>
   {{ end }}
 </div>
