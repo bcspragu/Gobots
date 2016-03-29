@@ -1,39 +1,65 @@
 {{define "head"}}
-<html ng-app="gobotApp">
+<!DOCTYPE html>
+<html lang="en" ng-app="gobotApp">
   <head>
-    <title>Gobots</title>
-    <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
-    <link rel="stylesheet" href="/css/main.css">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <title>Gobots</title>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+    <link rel="stylesheet" href="/css/main.css">
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
   </head>
   <body>
-    <div class="header">
-        <div class="home-menu pure-menu pure-menu-horizontal">
-            <a class="pure-menu-heading" href="/">Gobots</a>
-
-            <ul class="pure-menu-list">
-                <li class="pure-menu-item {{if eq .Active 0}}pure-menu-selected{{end}}"><a href="/" class="pure-menu-link">Home</a></li>
-                <li class="pure-menu-item {{if eq .Active 1}}pure-menu-selected{{end}}"><a href="/bots" class="pure-menu-link">Bots Online</a></li>
-                <li class="pure-menu-item {{if eq .Active 2}}pure-menu-selected{{end}}"><a href="/matches" class="pure-menu-link">Matches</a></li>
-                {{if .Player}}
-                  <li class="pure-menu-item"><span class="pure-menu-link">Hello {{.Player.Name}}</span></li>
-                {{end}}
-            </ul>
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="/">Gobots</a>
         </div>
-    </div>
+        <div id="navbar" class="collapse navbar-collapse">
+          <ul class="nav navbar-nav">
+            <li><a class="{{if eq .Active 0}}active{{end}}" href="/">Home</a></li>
+            <li><a class="{{if eq .Active 1}}active{{end}}" href="/bots">Bots Online</a></li>
+            <li><a class="{{if eq .Active 2}}active{{end}}" href="/matches">Matches</a></li>
+            {{if .Player}}
+              <li><span>Hello {{.Player.Name}}</span></li>
+            {{end}}
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+    <div class="container">
 {{end}}
 
 {{define "foot"}}
-    <script>
-      var Host = "{{ .Host }}";
-    </script>
-    <script src="https://code.jquery.com/jquery-2.2.0.min.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular.min.js"></script>
-    <script src="/js/gopher.js"></script>
-    <script src="/js/game.js"></script>
-    {{ range .Scripts }}
-      <script src="{{.}}"></script>
-    {{ end }}
+      <script>
+        var Host = "{{ .Host }}";
+      </script>
+      <!-- Latest compiled and minified JavaScript -->
+      <script src="https://code.jquery.com/jquery-2.2.0.min.js"></script>
+      <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+      <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular.min.js"></script>
+      <script src="/js/gopher.js"></script>
+      <script src="/js/game.js"></script>
+      {{ range .Scripts }}
+        <script src="{{.}}"></script>
+      {{ end }}
+    </div>
   </body>
 </html>
 {{end}}

@@ -17,6 +17,7 @@ type datastore interface {
 	// Users
 	createUser(u userInfo) error
 	loadUser(a accessToken) (*userInfo, error)
+	lookupUser(name string) (*userInfo, error)
 
 	// AIs
 	createAI(info *aiInfo) (id aiID, err error)
@@ -147,6 +148,28 @@ func (db *dbImpl) listAIsForUser(a accessToken) ([]*aiInfo, error) {
 			}
 			if info.Token == a {
 				result = append(result, info)
+			}
+		}
+		return nil
+	})
+	return result, err
+}
+
+func (db *dbImpl) lookupUser(name string) (*userInfo, error) {
+	var result *userInfo
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(UserBucket)
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if len(v) == 0 {
+				continue
+			}
+			info := new(userInfo)
+			if err := gob.NewDecoder(bytes.NewReader(v)).Decode(info); err != nil {
+				continue
+			}
+			if info.Name == name {
+				result = info
 			}
 		}
 		return nil

@@ -79,14 +79,30 @@ func (e *aiEndpoint) listOnlineAIs() []onlineAI {
 
 // connect adds an online AI
 func (e *aiEndpoint) connect(name, token string, ai botapi.Ai) (aiID, error) {
-	info, err := e.ds.loadUser(accessToken(token))
+	infos, err := e.ds.listAIsForUser(accessToken(token))
 	if err != nil {
 		return "", err
 	}
+	var id aiID
+	for _, info := range infos {
+		if info.Name == name {
+			id = info.ID
+		}
+	}
+	// No bot was found with that name
+	if id == aiID("") {
+		id, err = e.ds.createAI(&aiInfo{
+			Name:  name,
+			Token: accessToken(token),
+		})
+		if err != nil {
+			return "", err
+		}
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.online[info.ID] = ai
-	return info.ID, nil
+	e.online[id] = ai
+	return id, nil
 }
 
 // removeAIs drops AIs from online, usually via disconnection.

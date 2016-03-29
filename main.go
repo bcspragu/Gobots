@@ -40,9 +40,10 @@ func main() {
 		log.Fatal("Can't encrypt the cookies! WHATEVER WILL WE DO")
 	}
 
-	http.HandleFunc("/", withLogin(serveIndex))
-	http.HandleFunc("/game/", withLogin(serveGame))
-	http.HandleFunc("/startMatch", withLogin(startMatch))
+	http.HandleFunc("/", baseWrapper(withLogin(serveIndex)))
+	http.HandleFunc("/createUser", baseWrapper(createUserHandler))
+	http.HandleFunc("/game/", baseWrapper(withLogin(serveGame)))
+	http.HandleFunc("/startMatch", baseWrapper(withLogin(startMatch)))
 
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
 	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(http.Dir("img"))))
@@ -59,7 +60,7 @@ func main() {
 	}
 }
 
-func serveIndex(c context) {
+func serveIndex(c context) error {
 	data := tmplData{
 		Data: map[string]interface{}{
 			"Bots": globalAIEndpoint.listOnlineAIs(),
@@ -69,12 +70,10 @@ func serveIndex(c context) {
 		},
 	}
 
-	if err := templates.ExecuteTemplate(c, "index.html", data); err != nil {
-		serveError(c.w, err)
-	}
+	return templates.ExecuteTemplate(c, "index.html", data)
 }
 
-func serveGame(c context) {
+func serveGame(c context) error {
 	replay, err := db.lookupGame(c.gameID())
 	if c.roundNumber() == -1 {
 		data := tmplData{
@@ -83,22 +82,20 @@ func serveGame(c context) {
 				"Exists": err != errDatastoreNotFound,
 			},
 		}
-		if err := templates.ExecuteTemplate(c, "game.html", data); err != nil {
-			serveError(c.w, err)
-		}
-		return
+		return templates.ExecuteTemplate(c, "game.html", data)
 	}
 
 	// If we're here, they're looking for a single boards encoding
 	board, err := engine.NewPlayback(replay).Board(c.roundNumber())
 	if err != nil {
-		serveError(c.w, err)
+		return err
 	}
 	d, err := json.Marshal(board.ToJSONBoard())
 	if err != nil {
-		serveError(c.w, err)
+		return err
 	}
 	c.w.Write(d)
+	return nil
 }
 
 func serveError(w http.ResponseWriter, err error) {
@@ -106,8 +103,7 @@ func serveError(w http.ResponseWriter, err error) {
 	log.Printf("Error: %v\n", err)
 }
 
-func startMatch(c context) {
-	//TODO DOIAFJHJKSHLAJSDLKJASLKDJ
+func startMatch(c context) error {
 	ai1, _ := db.lookupAI(aiID(c.r.FormValue("ai1")))
 	ai2, _ := db.lookupAI(aiID(c.r.FormValue("ai2")))
 	online := globalAIEndpoint.listOnlineAIs()
@@ -130,10 +126,11 @@ func startMatch(c context) {
 	}()
 	gid := <-gidCh
 	if gid == "" {
-		serveError(c.w, errors.New("game couldn't start"))
+		return errors.New("game couldn't start")
 	} else {
 		http.Redirect(c.w, c.r, "/game/"+string(gid), http.StatusFound)
 	}
+	return nil
 }
 
 // TODO: Make this happen on successful connection
@@ -145,11 +142,25 @@ func createAI(name, token string) error {
 	return err
 }
 
-// TODO: Create user properly
-func createUser(c context) {
+func createUserHandler(c context) error {
+	if c.r.Method != "POST" {
+		return errors.New("Wrong method")
+	}
+
+	if c.u != nil {
+		return errors.New("User already exists")
+	}
+
+	name := c.r.PostFormValue("username")
+	if u, err := db.lookupUser(name); u != nil {
+		return errors.New("User already exists")
+	} else if err != nil {
+		return err
+	}
+
 	token := genName(25)
-	go db.createUser(userInfo{
-		Name:  "Dude", // TODO: Take name
+	db.createUser(userInfo{
+		Name:  name,
 		Token: accessToken(token),
 	})
 
@@ -166,5 +177,11 @@ func createUser(c context) {
 		http.SetCookie(c.w, cookie)
 	}
 
-	http.Redirect(c.w, c.r, "/", http.StatusFound)
+	data := tmplData{
+		Data: map[string]interface{}{
+			"Token": token,
+		},
+	}
+
+	return templates.ExecuteTemplate(c, "token.html", data)
 }
