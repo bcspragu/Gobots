@@ -23,6 +23,10 @@ func newContext(w http.ResponseWriter, r *http.Request) context {
 	}
 }
 
+func (c *context) Write(s string) {
+	c.w.Write([]byte(s))
+}
+
 func (c *context) gameID() gameID {
 	return gameID(strings.Split(c.r.URL.Path, "/")[2])
 }

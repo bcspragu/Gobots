@@ -40,10 +40,12 @@ func main() {
 		log.Fatal("Can't encrypt the cookies! WHATEVER WILL WE DO")
 	}
 
-	http.HandleFunc("/", baseWrapper(withLogin(serveIndex)))
+	http.HandleFunc("/", baseWrapper(serveIndex))
 	http.HandleFunc("/createUser", baseWrapper(createUserHandler))
-	http.HandleFunc("/game/", baseWrapper(withLogin(serveGame)))
-	http.HandleFunc("/startMatch", baseWrapper(withLogin(startMatch)))
+	http.HandleFunc("/login", baseWrapper(loginHandler))
+	http.HandleFunc("/logout", baseWrapper(requireLogin(logoutHandler)))
+	http.HandleFunc("/game/", baseWrapper(serveGame))
+	http.HandleFunc("/startMatch", baseWrapper(requireLogin(startMatch)))
 
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
 	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(http.Dir("img"))))
@@ -142,18 +144,78 @@ func createAI(name, token string) error {
 	return err
 }
 
+func loginHandler(c context) error {
+	if c.r.Method != "POST" {
+		return errors.New("Wrong method")
+	}
+
+	if c.u != nil {
+		c.Write("You're already logged in")
+		return nil
+	}
+
+	token := c.r.PostFormValue("accessToken")
+	if u, err := db.loadUser(accessToken(token)); u == nil {
+		c.Write("User doesn't exist")
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	nutFact := nutritionFacts{
+		AccessToken: token,
+	}
+
+	if encoded, err := s.Encode("info", nutFact); err == nil {
+		cookie := &http.Cookie{
+			Name:  "info",
+			Value: encoded,
+			Path:  "/",
+		}
+		http.SetCookie(c.w, cookie)
+	} else {
+		return err
+	}
+
+	c.Write("Yes.")
+	return nil
+}
+
+func logoutHandler(c context) error {
+	// Clear token
+	nutFact := nutritionFacts{
+		AccessToken: "",
+	}
+
+	if encoded, err := s.Encode("info", nutFact); err == nil {
+		cookie := &http.Cookie{
+			Name:  "info",
+			Value: encoded,
+			Path:  "/",
+		}
+		http.SetCookie(c.w, cookie)
+	} else {
+		return err
+	}
+
+	http.Redirect(c.w, c.r, "/", http.StatusFound)
+	return nil
+}
+
 func createUserHandler(c context) error {
 	if c.r.Method != "POST" {
 		return errors.New("Wrong method")
 	}
 
 	if c.u != nil {
-		return errors.New("User already exists")
+		c.Write("You're already logged in.")
+		return nil
 	}
 
-	name := c.r.PostFormValue("username")
+	name := c.r.PostFormValue("userName")
 	if u, err := db.lookupUser(name); u != nil {
-		return errors.New("User already exists")
+		c.Write("User already exists")
+		return nil
 	} else if err != nil {
 		return err
 	}
@@ -177,11 +239,6 @@ func createUserHandler(c context) error {
 		http.SetCookie(c.w, cookie)
 	}
 
-	data := tmplData{
-		Data: map[string]interface{}{
-			"Token": token,
-		},
-	}
-
-	return templates.ExecuteTemplate(c, "token.html", data)
+	c.Write("Your access token is: " + token + ". You'll use this to login and to get your bot on the server.")
+	return nil
 }

@@ -11,11 +11,18 @@
   margin: 20px;
 }
 
-/* Fix this */
-.option-section > div {
+.option-container {
   padding: 25px;
   background-color: #eee;
   border-radius: 5px;
+}
+
+li > .nav-username {
+  color: #9d9d9d;
+  display: block;
+  line-height: 20px;
+  padding: 15px;
+  position: relative;
 }
 
 .go-img {

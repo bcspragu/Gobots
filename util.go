@@ -4,6 +4,7 @@ import (
 	cryptorand "crypto/rand"
 	"errors"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 
@@ -16,14 +17,17 @@ type nutritionFacts struct {
 	AccessToken string
 }
 
-func withLogin(handler func(c context) error) func(c context) error {
+func requireLogin(handler func(c context) error) func(c context) error {
 	return func(c context) error {
 		// Do some best-effort context-filling
 		if nutFact, err := loadCookie(c.r); err == nil {
 			c.token = accessToken(nutFact.AccessToken)
 			if nutFact.AccessToken != "" {
-				if u, err := db.loadUser(accessToken(nutFact.AccessToken)); err == nil {
-					c.u = u
+				if u, err := db.loadUser(accessToken(nutFact.AccessToken)); err != nil {
+					return err
+				} else if u == nil {
+					log.Printf("Error: User tried to access %s without being logged in\n", c.r.URL.Path)
+					return nil
 				}
 			}
 		}
@@ -34,6 +38,14 @@ func withLogin(handler func(c context) error) func(c context) error {
 func baseWrapper(handler func(c context) error) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c := newContext(w, r)
+		if nutFact, err := loadCookie(c.r); err == nil {
+			c.token = accessToken(nutFact.AccessToken)
+			if nutFact.AccessToken != "" {
+				if u, err := db.loadUser(accessToken(nutFact.AccessToken)); err == nil {
+					c.u = u
+				}
+			}
+		}
 		if err := handler(c); err != nil {
 			serveError(c.w, err)
 		}

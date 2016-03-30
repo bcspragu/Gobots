@@ -37,7 +37,8 @@
             <li><a class="{{if eq .Active 1}}active{{end}}" href="/bots">Bots Online</a></li>
             <li><a class="{{if eq .Active 2}}active{{end}}" href="/matches">Matches</a></li>
             {{if .Player}}
-              <li><span>Hello {{.Player.Name}}</span></li>
+              <li><span class="nav-username">Hello {{.Player.Name}}</span></li>
+              <li><a href="/logout">Logout</a></li>
             {{end}}
           </ul>
         </div><!--/.nav-collapse -->

@@ -2,25 +2,33 @@
 {{if not .Player}}
   <div class="row">
     <div class="col-md-6 option-section">
-      <div>
+      <div class="option-container">
         <h2 class="subheader">If you already have an access token&hellip;</h2>
         <p>
           Enter it below to login
         </p>
-        <form action="/createUser" method="POST">
+        <form class="ajax-form login-form" action="/login" method="POST">
           <div class="form-group">
-            <label for="username">Username:</label><br>
-            <input class="form-control" type="text" name="username" placeholder="Enter a unique username">
+            <label for="accessToken">Access Token:</label><br>
+            <input class="form-control" type="text" name="accessToken" placeholder="Enter your token">
           </div>
           <button type="submit" class="btn btn-default">Log In</button>
         </form>
       </div>
     </div>
     <div class="col-md-6 option-section">
-      <div>
+      <div class="option-container">
         <h2 class="subheader">To create a new account&hellip;</h2>
-        <p>Enter a username below</p>
-        <p><a class="btn btn-default" href="#" role="button">View details »</a></p>
+        <p>
+          Enter a unique username below
+        </p>
+        <form class="ajax-form create-user-form" action="/createUser" method="POST">
+          <div class="form-group">
+            <label for="userName">Username:</label><br>
+            <input class="form-control" type="text" name="userName" placeholder="Enter a unique username">
+          </div>
+          <button type="submit" class="btn btn-default">Create account</button>
+        </form>
       </div>
     </div>
   </div>
