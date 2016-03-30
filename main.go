@@ -24,10 +24,6 @@ var (
 	globalAIEndpoint *aiEndpoint
 )
 
-const (
-	clientId = "07ef388cb32ffbbd5146"
-)
-
 func main() {
 	flag.Parse()
 	var err error
@@ -135,15 +131,6 @@ func startMatch(c context) error {
 	return nil
 }
 
-// TODO: Make this happen on successful connection
-func createAI(name, token string) error {
-	_, err := db.createAI(&aiInfo{
-		Name:  name,
-		Token: accessToken(token),
-	})
-	return err
-}
-
 func loginHandler(c context) error {
 	if c.r.Method != "POST" {
 		return errors.New("Wrong method")
@@ -213,7 +200,7 @@ func createUserHandler(c context) error {
 	}
 
 	name := c.r.PostFormValue("userName")
-	if u, err := db.lookupUser(name); u != nil {
+	if exists, err := db.userExists(name); exists {
 		c.Write("User already exists")
 		return nil
 	} else if err != nil {
@@ -221,10 +208,14 @@ func createUserHandler(c context) error {
 	}
 
 	token := genName(25)
-	db.createUser(userInfo{
+	_, err := db.createUser(userInfo{
 		Name:  name,
 		Token: accessToken(token),
 	})
+
+	if err != nil {
+		return err
+	}
 
 	nutFact := nutritionFacts{
 		AccessToken: token,

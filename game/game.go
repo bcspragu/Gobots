@@ -278,8 +278,8 @@ const (
 	exitUsage = 64
 )
 
-func StartRobotServer(name, token string, factory Factory) {
-	c, err := Dial("http://gobotgame.com:8001")
+func StartServerForFactory(name, token string, factory Factory) {
+	c, err := Dial("localhost:8001")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "dial:", err)
 		os.Exit(exitFail)
@@ -298,4 +298,11 @@ func StartRobotServer(name, token string, factory Factory) {
 		fmt.Fprintln(os.Stderr, "close:", err)
 		os.Exit(exitFail)
 	}
+}
+
+func StartServerForBot(name, token string, ai AI) {
+	factory := func(gameID string) AI {
+		return ai
+	}
+	StartServerForFactory(name, token, factory)
 }

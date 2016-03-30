@@ -81,6 +81,7 @@ func (e *aiEndpoint) listOnlineAIs() []onlineAI {
 func (e *aiEndpoint) connect(name, token string, ai botapi.Ai) (aiID, error) {
 	infos, err := e.ds.listAIsForUser(accessToken(token))
 	if err != nil {
+		log.Println("EAR", err)
 		return "", err
 	}
 	var id aiID
@@ -92,10 +93,10 @@ func (e *aiEndpoint) connect(name, token string, ai botapi.Ai) (aiID, error) {
 	// No bot was found with that name
 	if id == aiID("") {
 		id, err = e.ds.createAI(&aiInfo{
-			Name:  name,
-			Token: accessToken(token),
-		})
+			Name: name,
+		}, accessToken(token))
 		if err != nil {
+			log.Println("EAM", err)
 			return "", err
 		}
 	}
@@ -125,6 +126,7 @@ func (aic *aiConnector) Connect(call botapi.AiConnector_connect) error {
 	name, _ := creds.BotName()
 	id, err := aic.e.connect(name, tok, call.Params.Ai())
 	if err != nil {
+		log.Println("EAZ", err)
 		return err
 	}
 	aic.ais = append(aic.ais, id)

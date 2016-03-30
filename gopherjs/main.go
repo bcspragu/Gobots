@@ -16,6 +16,7 @@ func main() {
 	})
 }
 
+// I think it might make sense to ditch jBoard and encode/decode to/from gob/base64
 func GetBoard(jsonBoard string) *js.Object {
 	var jBoard *engine.JSONBoard
 	json.Unmarshal([]byte(jsonBoard), &jBoard)

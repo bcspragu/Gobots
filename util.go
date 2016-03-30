@@ -24,9 +24,11 @@ func requireLogin(handler func(c context) error) func(c context) error {
 			c.token = accessToken(nutFact.AccessToken)
 			if nutFact.AccessToken != "" {
 				if u, err := db.loadUser(accessToken(nutFact.AccessToken)); err != nil {
+					http.Redirect(c.w, c.r, "/", http.StatusFound)
 					return err
 				} else if u == nil {
 					log.Printf("Error: User tried to access %s without being logged in\n", c.r.URL.Path)
+					http.Redirect(c.w, c.r, "/", http.StatusFound)
 					return nil
 				}
 			}
@@ -43,6 +45,8 @@ func baseWrapper(handler func(c context) error) func(http.ResponseWriter, *http.
 			if nutFact.AccessToken != "" {
 				if u, err := db.loadUser(accessToken(nutFact.AccessToken)); err == nil {
 					c.u = u
+				} else {
+					log.Printf("Error: %v\n", err)
 				}
 			}
 		}
