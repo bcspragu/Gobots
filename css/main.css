@@ -31,9 +31,14 @@ li > .nav-username {
 }
 
 .gameBoardContainer {
-    display: inline-block;
-    position: relative;
-    width: 50%;
+  display: inline-block;
+  position: relative;
+  width: 40%;
+}
+
+.col-centered {
+  float: none;
+  margin: 0 auto;
 }
 
 .gameBoardContainer:after {

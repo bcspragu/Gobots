@@ -115,7 +115,7 @@ func (t Action) toWire(id uint32, wire botapi.Turn) {
 	}
 }
 
-// ActionKing is an enumeration of the kinds of turns.
+// ActionKind is an enumeration of the kinds of turns.
 type ActionKind int
 
 // Kinds of turns.

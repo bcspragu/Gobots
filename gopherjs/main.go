@@ -1,7 +1,9 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
+	"encoding/base64"
+	"encoding/gob"
 
 	"github.com/gopherjs/gopherjs/js"
 
@@ -16,9 +18,10 @@ func main() {
 	})
 }
 
-// I think it might make sense to ditch jBoard and encode/decode to/from gob/base64
-func GetBoard(jsonBoard string) *js.Object {
-	var jBoard *engine.JSONBoard
-	json.Unmarshal([]byte(jsonBoard), &jBoard)
-	return js.MakeWrapper(jBoard.ToBoard())
+func GetBoard(base64Board string) *js.Object {
+	var board engine.Board
+	buf := bytes.NewReader([]byte(base64Board))
+	r := base64.NewDecoder(base64.StdEncoding, buf)
+	gob.NewDecoder(r).Decode(&board)
+	return js.MakeWrapper(&board)
 }

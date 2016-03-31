@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net"
 	"sync"
@@ -22,7 +23,7 @@ type aiEndpoint struct {
 }
 
 const (
-	BoardSize = 20
+	BoardSize = 17
 )
 
 func startAIEndpoint(addr string, ds datastore) (*aiEndpoint, error) {
@@ -80,8 +81,8 @@ func (e *aiEndpoint) listOnlineAIs() []onlineAI {
 // connect adds an online AI
 func (e *aiEndpoint) connect(name, token string, ai botapi.Ai) (aiID, error) {
 	infos, err := e.ds.listAIsForUser(accessToken(token))
+	log.Println("hh", infos, err)
 	if err != nil {
-		log.Println("EAR", err)
 		return "", err
 	}
 	var id aiID
@@ -96,13 +97,18 @@ func (e *aiEndpoint) connect(name, token string, ai botapi.Ai) (aiID, error) {
 			Name: name,
 		}, accessToken(token))
 		if err != nil {
-			log.Println("EAM", err)
 			return "", err
 		}
 	}
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.online[id] = ai
+	if _, exists := e.online[id]; exists {
+		return "", errors.New("That bot is already connected. Choose a new name.")
+	} else {
+		e.online[id] = ai
+	}
+
 	return id, nil
 }
 
@@ -126,7 +132,6 @@ func (aic *aiConnector) Connect(call botapi.AiConnector_connect) error {
 	name, _ := creds.BotName()
 	id, err := aic.e.connect(name, tok, call.Params.Ai())
 	if err != nil {
-		log.Println("EAZ", err)
 		return err
 	}
 	aic.ais = append(aic.ais, id)
@@ -157,7 +162,9 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 		go aiB.takeTurn(turnCtx, gid, b, engine.P2Faction, chB)
 		ra, rb := <-chA, <-chB
 		if ra.err.HasError() || rb.err.HasError() {
-			// TODO: Something with errors
+			// TODO: Something better with errors
+			log.Println("ra", ra.err)
+			log.Println("rb", rb.err)
 		}
 		b.Update(ra.results, rb.results)
 		_, s, err := capnp.NewMessage(capnp.SingleSegment(nil))

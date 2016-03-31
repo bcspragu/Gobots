@@ -13,39 +13,48 @@ const (
 	P1Faction = 1
 	P2Faction = 2
 
-	InitialHealth = 5
+	InitialHealth = 50
 
-	CollisionDamage = 1
-	AttackDamage    = 2
-	DestructDamage  = 2
+	CollisionDamage = 5
+	AttackDamage    = 10
+	DestructDamage  = 15
 	SelfDamage      = 1000 // Make them super dead
 
-	NewBotsSpacing = 5 // Number of rounds to wait before spawning new bots
+	NewBotsSpacing = 10 // Number of rounds to wait before spawning new bots
 )
 
-type CellInfo struct {
-	Bot      *Robot
-	CellType CellType
-}
+type (
+	SpawnFunc func(Loc) bool
 
-type CellType int
-
-type SpawnFunc func(Loc) bool
-
-var all SpawnFunc = func(loc Loc) bool {
-	return true
-}
-
-var everyOther SpawnFunc = func(loc Loc) bool {
-	return loc.Y%2 == 0
-}
-
-var randomSpawnFuncGen = func(b *Board) SpawnFunc {
-	r := rand.Perm(b.Size.Y)
-	return func(loc Loc) bool {
-		return r[loc.Y]%2 == 0
+	CellInfo struct {
+		Bot      *Robot
+		CellType CellType
 	}
-}
+
+	LocPair struct {
+		L Loc
+		B *Robot
+	}
+
+	CellType   int
+	DamageType int
+
+	collisionMap map[Loc][]botMove
+
+	botMove struct {
+		Bot      *Robot
+		Location Loc
+		Turn     botapi.Turn
+	}
+)
+
+const (
+	UnknownDamageType DamageType = iota
+	Collision
+	Attack
+	Destruct
+	Self
+)
 
 const (
 	UnknownCellType CellType = iota
@@ -53,12 +62,28 @@ const (
 	Valid
 )
 
-type collisionMap map[Loc][]*Robot
+var (
+	all SpawnFunc = func(loc Loc) bool {
+		return true
+	}
 
-type LocPair struct {
-	L Loc
-	B *Robot
-}
+	everyOther SpawnFunc = func(loc Loc) bool {
+		return loc.Y%2 == 0
+	}
+
+	randomSpawnFuncGen = func(b *Board) SpawnFunc {
+		r := rand.Perm(b.Size.Y)
+		return func(loc Loc) bool {
+			return r[loc.Y]%2 == 0
+		}
+	}
+
+	damageMap = map[DamageType]int{
+		Collision: CollisionDamage,
+		Attack:    AttackDamage,
+		Destruct:  DestructDamage,
+	}
+)
 
 type Board struct {
 	Locs map[Loc]*Robot
@@ -72,51 +97,6 @@ type Board struct {
 
 func (b *Board) CellsJS() [][]CellType {
 	return b.Cells
-}
-
-type JSONBoard struct {
-	Pairs []LocPair
-
-	Cells [][]CellType
-	Size  Loc
-	Round int
-
-	NextID RobotID
-}
-
-func (b *Board) ToJSONBoard() *JSONBoard {
-	j := &JSONBoard{
-		Size:   b.Size,
-		Round:  b.Round,
-		NextID: b.NextID,
-		Cells:  b.Cells,
-	}
-
-	j.Pairs = make([]LocPair, len(b.Locs))
-	i := 0
-	for loc, bot := range b.Locs {
-		j.Pairs[i] = LocPair{
-			L: loc,
-			B: bot,
-		}
-		i++
-	}
-	return j
-}
-
-func (j *JSONBoard) ToBoard() *Board {
-	b := &Board{
-		Locs:   make(map[Loc]*Robot),
-		Size:   j.Size,
-		Round:  j.Round,
-		NextID: j.NextID,
-		Cells:  j.Cells,
-	}
-
-	for _, pair := range j.Pairs {
-		b.Locs[pair.L] = pair.B
-	}
-	return b
 }
 
 // EmptyBoard creates an empty board of the given size.
@@ -161,6 +141,13 @@ func NewBoard(w, h int) *Board {
 }
 
 func (b *Board) SpawnBots(spawnFunc SpawnFunc) {
+	// Clear out the spawn zone
+	for i := 0; i < b.Size.Y; i++ {
+		la, lb := Loc{0, i}, Loc{b.Size.X - 1, i}
+		delete(b.Locs, la)
+		delete(b.Locs, lb)
+	}
+
 	// Just line the ends with robots
 	for i := 0; i < b.Size.Y; i++ {
 		la, lb := Loc{0, i}, Loc{b.Size.X - 1, i}
@@ -183,21 +170,37 @@ func (b *Board) SpawnBots(spawnFunc SpawnFunc) {
 }
 
 func (b *Board) Update(ta, tb botapi.Turn_List) {
+	// Put all the moves and bots into a list
+	moves := make([]botMove, ta.Len()+tb.Len())
+	for i := 0; i < ta.Len(); i++ {
+		t := ta.At(i)
+		loc, bot := b.fromID(RobotID(t.Id()))
+		moves[i].Bot = bot
+		moves[i].Turn = t
+		moves[i].Location = loc
+	}
+	for i, l := 0, ta.Len(); i < tb.Len(); i++ {
+		t := tb.At(i)
+		_, bot := b.fromID(RobotID(t.Id()))
+		moves[i+l].Bot = bot
+		moves[i+l].Turn = t
+	}
 	c := make(collisionMap)
-	b.addCollisions(c, ta)
-	b.addCollisions(c, tb)
+	b.addCollisions(c, moves)
 
 	// Move the bots to their new locations, unless they collide with something,
 	// in which case just subtract 1 from their health and don't move them.
 
-	for loc, bots := range c {
+	// TODO: This allows bots to swap places, which isn't allowed in the original
+	// game.
+	for loc, ms := range c {
 		// If there's only one bot trying to get somewhere, just move them there
-		if len(bots) == 1 {
-			b.moveBot(bots[0], loc)
+		if len(ms) == 1 {
+			b.moveBot(ms[0].Bot, loc)
 		} else {
 			// Multiple bots, hurt 'em
-			for _, bot := range bots {
-				b.hurtBot(bot, CollisionDamage)
+			for _, m := range ms {
+				b.hurtBot(m, Collision)
 			}
 		}
 
@@ -213,15 +216,13 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 
 	// Allow all attacks to be issued before removing bots, because there's no
 	// good, sensical way to order attacks. They all happen simultaneously
-	b.issueAttacks(ta)
-	b.issueAttacks(tb)
+	b.issueAttacks(moves)
 
 	// Get rid of anyone who was viciously murdered
 	b.clearTheDead()
 
 	// Boom goes the dynamite
-	b.issueSelfDestructs(ta)
-	b.issueSelfDestructs(tb)
+	b.issueSelfDestructs(moves)
 
 	// Get rid of anyone killed in some kamikaze-shenanigans
 	b.clearTheDead()
@@ -233,50 +234,56 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 	}
 }
 
-func (b *Board) issueAttacks(ts botapi.Turn_List) {
-	for i := 0; i < ts.Len(); i++ {
-		t := ts.At(i)
-		if t.Which() != botapi.Turn_Which_attack {
+func (b *Board) issueAttacks(moves []botMove) {
+	for _, move := range moves {
+		if move.Turn.Which() != botapi.Turn_Which_attack {
 			continue
 		}
 
 		// They're attacking
-		loc, _ := b.fromID(RobotID(t.Id()))
-		xOff, yOff := directionOffsets(t.Attack())
+		xOff, yOff := directionOffsets(move.Turn.Attack())
 		attackLoc := Loc{
-			X: loc.X + xOff,
-			Y: loc.Y + yOff,
+			X: move.Location.X + xOff,
+			Y: move.Location.Y + yOff,
 		}
 
 		// If there's a bot at the attack location, make them sad
 		// You *can* hurt attack your own robots
 		victim := b.Locs[attackLoc]
 		if victim != nil {
-			b.hurtBot(victim, AttackDamage)
+			for _, m := range moves {
+				if m.Bot.ID == victim.ID {
+					b.hurtBot(m, Attack)
+					break
+				}
+			}
 		}
 	}
 }
 
-func (b *Board) issueSelfDestructs(ts botapi.Turn_List) {
-	for i := 0; i < ts.Len(); i++ {
-		t := ts.At(i)
-		if t.Which() != botapi.Turn_Which_selfDestruct {
+func (b *Board) issueSelfDestructs(moves []botMove) {
+	for _, move := range moves {
+		if move.Turn.Which() != botapi.Turn_Which_selfDestruct {
 			continue
 		}
 
 		// They're Metro-booming on production:
 		// (https://www.youtube.com/watch?v=NiM5ARaexPE)
-		loc, bomber := b.fromID(RobotID(t.Id()))
-		for _, boomLoc := range b.surrounding(loc) {
+		for _, boomLoc := range b.surrounding(move.Location) {
 			// If there's a bot in the blast radius
 			victim := b.Locs[boomLoc]
 			if victim != nil {
-				b.hurtBot(victim, DestructDamage)
+				for _, m := range moves {
+					if m.Bot.ID == victim.ID {
+						b.hurtBot(m, Destruct)
+						break
+					}
+				}
 			}
 		}
 
 		// Kill 'em
-		b.hurtBot(bomber, SelfDamage)
+		b.hurtBot(move, Self)
 	}
 }
 
@@ -312,18 +319,31 @@ func (b *Board) surrounding(loc Loc) []Loc {
 	return vLocs
 }
 
-func (b *Board) addCollisions(c collisionMap, ts botapi.Turn_List) {
-	for i := 0; i < ts.Len(); i++ {
-		t := ts.At(i)
-		_, bot := b.fromID(RobotID(t.Id()))
-		nextLoc := b.nextLoc(bot, t)
+func (b *Board) addCollisions(c collisionMap, moves []botMove) {
+	for _, move := range moves {
+		nextLoc := b.nextLoc(move)
 		// Add where they want to move
-		c[nextLoc] = append(c[nextLoc], bot)
+		c[nextLoc] = append(c[nextLoc], move)
 	}
 }
 
-func (b *Board) hurtBot(r *Robot, damage int) {
-	r.Health -= damage
+func (b *Board) hurtBot(move botMove, dt DamageType) {
+	switch dt {
+	case Self:
+		move.Bot.Health = 0
+	case Attack, Destruct:
+		// If they are guarding, they take half damage
+		if move.Turn.Which() == botapi.Turn_Which_guard {
+			move.Bot.Health -= damageMap[dt] / 2
+		} else {
+			move.Bot.Health -= damageMap[dt]
+		}
+	case Collision:
+		// If they aren't guarding, they take damage
+		if move.Turn.Which() != botapi.Turn_Which_guard {
+			move.Bot.Health -= damageMap[dt]
+		}
+	}
 }
 
 func (b *Board) clearTheDead() {
@@ -362,16 +382,16 @@ func abs(x int) int {
 	return x
 }
 
-func (b *Board) nextLoc(bot *Robot, t botapi.Turn) Loc {
-	currentLoc := b.robotLoc(bot)
+func (b *Board) nextLoc(move botMove) Loc {
+	currentLoc := b.robotLoc(move.Bot)
 	// If they aren't moving, return their current loc
-	if t.Which() != botapi.Turn_Which_move {
+	if move.Turn.Which() != botapi.Turn_Which_move {
 		return currentLoc
 	}
 
 	// They're moving, return where they're going
 
-	xOff, yOff := directionOffsets(t.Move())
+	xOff, yOff := directionOffsets(move.Turn.Move())
 	nextLoc := Loc{
 		X: currentLoc.X + xOff,
 		Y: currentLoc.Y + yOff,

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
+	"log"
 	"strconv"
 	"time"
 
@@ -103,7 +104,7 @@ func (db *dbImpl) createUser(uInfo userInfo) (id uID, err error) {
 		if err := b.Put([]byte(uInfo.Token), buf.Bytes()); err != nil {
 			return errors.New("DB might be in an inconsistent state, failed writing to UserBucket: " + err.Error())
 		}
-		buf.Reset()
+		buf = bytes.Buffer{}
 
 		b = tx.Bucket(UserLookupBucket)
 		if err := b.Put([]byte(uInfo.Name), []byte{}); err != nil {
@@ -123,10 +124,13 @@ func (db *dbImpl) createUser(uInfo userInfo) (id uID, err error) {
 }
 
 func (db *dbImpl) loadUser(a accessToken) (*userInfo, error) {
-	var u *userInfo
+	var u userInfo
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(UserBucket)
 		dat := b.Get([]byte(a))
+		if len(dat) == 0 {
+			return errDatastoreNotFound
+		}
 
 		buf := bytes.NewReader(dat)
 		dec := gob.NewDecoder(buf)
@@ -134,7 +138,7 @@ func (db *dbImpl) loadUser(a accessToken) (*userInfo, error) {
 		return dec.Decode(&u)
 	})
 
-	return u, err
+	return &u, err
 }
 
 func (db *dbImpl) userExists(name string) (exists bool, err error) {
@@ -161,7 +165,6 @@ func (db *dbImpl) createAI(info *aiInfo, a accessToken) (id aiID, err error) {
 		if err := gob.NewDecoder(buf).Decode(&u); err != nil {
 			return err
 		}
-		buf.Reset()
 
 		// Load the user's existing AIs
 		var ais []*aiInfo
@@ -170,14 +173,12 @@ func (db *dbImpl) createAI(info *aiInfo, a accessToken) (id aiID, err error) {
 		if len(dat) == 0 {
 			ais = []*aiInfo{}
 		} else {
-			if _, err := buf.Write(dat); err != nil {
-				return err
-			}
+			buf = bytes.NewBuffer(dat)
 			if err := gob.NewDecoder(buf).Decode(&ais); err != nil {
 				return err
 			}
-			buf.Reset()
 		}
+		buf = new(bytes.Buffer)
 
 		for _, ai := range ais {
 			if ai.Name == info.Name {
@@ -203,7 +204,8 @@ func (db *dbImpl) createAI(info *aiInfo, a accessToken) (id aiID, err error) {
 		if err := b.Put([]byte(id), buf.Bytes()); err != nil {
 			return errors.New("DB might be in an inconsistent state, failed writing to AIBucket: " + err.Error())
 		}
-		buf.Reset()
+		log.Println("put", buf.Bytes(), "in id ", id)
+		buf = new(bytes.Buffer)
 
 		// Append the AI to the list of AIs for this user and save that
 		b = tx.Bucket(UserAIBucket)
@@ -214,6 +216,7 @@ func (db *dbImpl) createAI(info *aiInfo, a accessToken) (id aiID, err error) {
 		if err := b.Put([]byte(u.ID), buf.Bytes()); err != nil {
 			return errors.New("DB might be in an inconsistent state, failed writing to UserAIBucket: " + err.Error())
 		}
+		log.Println("put", buf.Bytes(), "in token ", u.Token)
 		return nil
 	})
 	return
@@ -224,6 +227,7 @@ func (db *dbImpl) listAIsForUser(a accessToken) ([]*aiInfo, error) {
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(UserAIBucket)
 		dat := b.Get([]byte(a))
+		log.Println("Loaded", dat, "from", a)
 		if len(dat) == 0 {
 			infos = []*aiInfo{}
 			return nil

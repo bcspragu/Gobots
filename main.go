@@ -1,7 +1,9 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
+	"encoding/base64"
+	"encoding/gob"
 	"errors"
 	"flag"
 	"html/template"
@@ -39,7 +41,7 @@ func main() {
 	http.HandleFunc("/", baseWrapper(serveIndex))
 	http.HandleFunc("/createUser", baseWrapper(createUserHandler))
 	http.HandleFunc("/login", baseWrapper(loginHandler))
-	http.HandleFunc("/logout", baseWrapper(requireLogin(logoutHandler)))
+	http.HandleFunc("/logout", baseWrapper(logoutHandler))
 	http.HandleFunc("/game/", baseWrapper(serveGame))
 	http.HandleFunc("/startMatch", baseWrapper(requireLogin(startMatch)))
 
@@ -88,11 +90,14 @@ func serveGame(c context) error {
 	if err != nil {
 		return err
 	}
-	d, err := json.Marshal(board.ToJSONBoard())
+	var buf bytes.Buffer
+	err = gob.NewEncoder(&buf).Encode(board)
 	if err != nil {
 		return err
 	}
-	c.w.Write(d)
+	enc := base64.NewEncoder(base64.StdEncoding, c.w)
+	enc.Write(buf.Bytes())
+	enc.Close()
 	return nil
 }
 

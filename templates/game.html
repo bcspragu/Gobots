@@ -1,24 +1,23 @@
 {{ if .Data.Exists }}
-<div class="splash" ng-controller="GameController as game">
-  <h1 class="splash-head">Round [[game.round]]</h1>
-  <div class="gameBoardContainer">
-    <div class="gameBoard">
-      <div class="row" ng-repeat="row in game.rows track by $index">
-        <div class="cell" ng-repeat="cell in row track by $index" ng-class="{gopher: cell.Bot !== null, invalid: cell.CellType == 1}">
-          <img class="go-img" ng-src="[[cell.Bot.Faction == 1 ? '/img/gopher.jpg' : '/img/gopher2.jpg']]" ng-show="cell.Bot !== null"></div>
+  <div ng-controller="GameController as game">
+    <h1 class="header">Round [[game.round]]</h1>
+    <div class="row">
+      <div class="gameBoardContainer col-centered">
+        <div class="gameBoard">
+          <div class="row" ng-repeat="row in game.rows track by $index">
+            <div class="cell" ng-repeat="cell in row track by $index" ng-class="{gopher: cell.Bot !== null, invalid: cell.CellType == 1}">
+              <img class="go-img" ng-src="[[cell.Bot.Faction == 1 ? '/img/gopher.jpg' : '/img/gopher2.jpg']]" ng-show="cell.Bot !== null"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 {{ else }}
-<div class="splash">
-  <h1 class="splash-head">Game Not Found</h1>
-      <p class="splash-subhead">
-        ID {{ .Data.GameID }} doesn't exist
-      </p>
-  </div>
-</div>
+  <h1 class="Header">Game Not Found</h1>
+  <h2 class="subheader">
+    ID {{ .Data.GameID }} doesn't exist
+  </h2>
 {{ end }}
 
 
