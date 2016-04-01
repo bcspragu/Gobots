@@ -42,7 +42,7 @@ func initDB(dbName string) (datastore, error) {
 	}
 
 	err = db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{UserBucket, UserLookupBucket, GameBucket, UserAIBucket, AIBucket} {
+		for _, b := range [][]byte{UserBucket, UserLookupBucket, GameBucket, AIBucket} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -114,15 +114,6 @@ func (db *dbImpl) createUser(uInfo userInfo) (id uID, err error) {
 		if err := b.Put([]byte(uInfo.Name), []byte{}); err != nil {
 			return errors.New("DB might be in an inconsistent state, failed writing to UserLookupBucket: " + err.Error())
 		}
-
-		b = tx.Bucket(UserAIBucket)
-		if err := gob.NewEncoder(&buf).Encode([]*aiInfo{}); err != nil {
-			return err
-		}
-		log.Printf("CreateUser: Putting []*aiInfo{} into UserAIBucket [%s]=%v", uInfo.Token, buf.Bytes())
-		if err := b.Put([]byte(uInfo.Token), buf.Bytes()); err != nil {
-			return errors.New("DB might be in an inconsistent state, failed writing to UserAIBucket: " + err.Error())
-		}
 		return nil
 	})
 	return
@@ -135,7 +126,7 @@ func (db *dbImpl) loadUser(a accessToken) (*userInfo, error) {
 		dat := b.Get([]byte(a))
 		log.Printf("LoadUser: Loading UserBucket at [%s]=%v", a, dat)
 		if len(dat) == 0 {
-			return errDatastoreNotFound
+			return errUserNotFound
 		}
 
 		buf := bytes.NewReader(dat)
@@ -168,7 +159,7 @@ func (db *dbImpl) createAI(info *aiInfo, a accessToken) (id aiID, err error) {
 		dat := b.Get([]byte(a))
 		log.Printf("CreateAI: Loading UserBucket at [%s]=%v", a, dat)
 		if len(dat) == 0 {
-			return errDatastoreNotFound
+			return errUserNotFound
 		}
 		buf := bytes.NewBuffer(dat)
 		if err := gob.NewDecoder(buf).Decode(&u); err != nil {
@@ -179,6 +170,7 @@ func (db *dbImpl) createAI(info *aiInfo, a accessToken) (id aiID, err error) {
 
 		for _, ai := range u.AIs {
 			if ai.Name == info.Name {
+				log.Printf("CreateAI: Bot %s already exists, not creating", info.Name)
 				return errors.New("Bot already exists")
 			}
 		}
@@ -198,42 +190,43 @@ func (db *dbImpl) createAI(info *aiInfo, a accessToken) (id aiID, err error) {
 		if err := gob.NewEncoder(buf).Encode(newInfo); err != nil {
 			return err
 		}
+		log.Printf("CreateAI: Putting into AIBucket at [%s]=%v", id, buf.Bytes())
 		if err := b.Put([]byte(id), buf.Bytes()); err != nil {
 			return errors.New("DB might be in an inconsistent state, failed writing to AIBucket: " + err.Error())
 		}
 		log.Println("put", buf.Bytes(), "in id ", id)
 		buf = new(bytes.Buffer)
 
+		b = tx.Bucket(UserBucket)
 		// Append the AI to the list of AIs for this user and save that
-		b = tx.Bucket(UserAIBucket)
-		ais = append(uais, newInfo)
-		if err := gob.NewEncoder(buf).Encode(ais); err != nil {
+		u.AIs = append(u.AIs, newInfo)
+		if err := gob.NewEncoder(buf).Encode(u); err != nil {
 			return err
 		}
-		if err := b.Put([]byte(u.ID), buf.Bytes()); err != nil {
+		log.Printf("CreateAI: Putting into UserBucket at [%s]=%v", a, buf.Bytes())
+		if err := b.Put([]byte(a), buf.Bytes()); err != nil {
 			return errors.New("DB might be in an inconsistent state, failed writing to UserAIBucket: " + err.Error())
 		}
-		log.Println("put", buf.Bytes(), "in token ", u.Token)
 		return nil
 	})
 	return
 }
 
 func (db *dbImpl) listAIsForUser(a accessToken) ([]*aiInfo, error) {
-	var infos []*aiInfo
+	var info userInfo
 	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(UserAIBucket)
+		b := tx.Bucket(UserBucket)
 		dat := b.Get([]byte(a))
-		log.Println("Loaded", dat, "from", a)
+		log.Printf("ListAIsForUser: Loading from UserBucket at [%s]=%v", a, dat)
 		if len(dat) == 0 {
-			infos = []*aiInfo{}
-			return nil
+			return errUserNotFound
 		}
 
 		buf := bytes.NewReader(dat)
-		return gob.NewDecoder(buf).Decode(&infos)
+		return gob.NewDecoder(buf).Decode(&info)
 	})
-	return infos, err
+	log.Printf("ListAIsForUser: Decoding from UserBucket at [%s]=%v", a, info)
+	return info.AIs, err
 }
 
 func (db *dbImpl) lookupAI(id aiID) (*aiInfo, error) {
@@ -242,7 +235,7 @@ func (db *dbImpl) lookupAI(id aiID) (*aiInfo, error) {
 		b := tx.Bucket(AIBucket)
 		dat := b.Get([]byte(id))
 		if len(dat) == 0 {
-			return errDatastoreNotFound
+			return errAINotFound
 		}
 
 		buf := bytes.NewReader(dat)
@@ -291,7 +284,7 @@ func (db *dbImpl) addRound(id gameID, round botapi.Replay_Round) error {
 		key := []byte(id)
 		data := b.Get(key)
 		if len(data) == 0 {
-			return errDatastoreNotFound
+			return errGameNotFound
 		}
 		msg, err := capnp.Unmarshal(copyBytes(data))
 		if err != nil {
@@ -359,7 +352,7 @@ func (db *dbImpl) lookupGame(id gameID) (botapi.Replay, error) {
 		b := tx.Bucket(GameBucket)
 		data := b.Get([]byte(id))
 		if len(data) == 0 {
-			return errDatastoreNotFound
+			return errGameNotFound
 		}
 
 		msg, err := capnp.Unmarshal(copyBytes(data))
@@ -380,4 +373,6 @@ func copyBytes(b []byte) []byte {
 }
 
 var errDatastoreNotImplemented = errors.New("gobots: datastore operation not implemented")
-var errDatastoreNotFound = errors.New("gobots: datastore entity not found")
+var errUserNotFound = errors.New("gobots: user not found")
+var errAINotFound = errors.New("gobots: AI not found")
+var errGameNotFound = errors.New("gobots: game not found")

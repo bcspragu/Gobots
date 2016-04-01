@@ -79,7 +79,7 @@ func serveGame(c context) error {
 		data := tmplData{
 			Data: map[string]interface{}{
 				"GameID": c.gameID(),
-				"Exists": err != errDatastoreNotFound,
+				"Exists": err != errGameNotFound,
 			},
 		}
 		return templates.ExecuteTemplate(c, "game.html", data)
