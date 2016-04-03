@@ -34,6 +34,13 @@ func (b *Board) Find(f func(*Robot) bool) *Robot {
 	return nil
 }
 
+func (b *Board) LocType(loc Loc) LocType {
+	if loc.X >= 0 && loc.Y >= 0 && loc.X < b.Size.X && loc.Y < b.Size.Y {
+		return b.LType[loc.X][loc.Y]
+	}
+	return Invalid
+}
+
 // IsInside reports whether loc is inside the board bounds.
 func (b *Board) IsInside(loc Loc) bool {
 	return loc.X >= 0 && loc.X < len(b.Cells[0]) && loc.Y >= 0 && loc.Y < len(b.Cells)

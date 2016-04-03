@@ -24,7 +24,7 @@ struct Credentials {
 
 interface Ai {
   # Interface that a competitor implements.
-  takeTurn @0 (board :Board) -> (turns :List(Turn));
+  takeTurn @0 (board :InitialBoard) -> (turns :List(Turn));
 }
 
 struct Board {

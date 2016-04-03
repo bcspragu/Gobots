@@ -1,17 +1,12 @@
 package main
 
-import (
-	"log"
-
-	"github.com/bcspragu/Gobots/game"
-)
+import "github.com/bcspragu/Gobots/game"
 
 type pathfinder struct {
 	targets map[uint32]uint32
 }
 
 func (pf *pathfinder) Act(b *game.Board, r *game.Robot) game.Action {
-	log.Printf("Pathfinder making moves")
 	// Immediate surrounding attacks
 	ds := []game.Direction{
 		game.North,

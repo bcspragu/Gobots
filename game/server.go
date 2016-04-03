@@ -51,7 +51,7 @@ func (c *Client) Close() error {
 func (c *Client) RegisterAI(name, token string, factory Factory) error {
 	a := botapi.Ai_ServerToClient(&aiAdapter{
 		factory: factory,
-		games:   make(map[string]AI),
+		games:   make(map[string]gameState),
 	})
 	_, err := c.connector.Connect(context.TODO(), func(r botapi.ConnectRequest) error {
 		creds, err := r.NewCredentials()

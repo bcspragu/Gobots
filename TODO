@@ -1,4 +1,4 @@
 -Add methods for even easier usage of AI package [In Progress]
 -Handle disconnect error cases better [Next on the hit list]
 -Move 3rd party things to third_party
--Add conn.Wait() call in goroutine, followed by a new signaling channel. This way you can try to reconnect on failure
+-Only send down the list of cells on the first RPC call

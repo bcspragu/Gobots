@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"math/rand"
 	"time"
 
@@ -49,6 +48,5 @@ func (random) Act(b *game.Board, r *game.Robot) game.Action {
 	if ak == game.Move || ak == game.Attack {
 		a.Direction = ds[bb]
 	}
-	log.Printf("Making move %+v from %d %d", a, aa, bb)
 	return a
 }

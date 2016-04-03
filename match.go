@@ -231,12 +231,16 @@ type turnResult struct {
 
 func (oa *onlineAI) takeTurn(ctx gocontext.Context, gid gameID, b *engine.Board, faction int, ch chan<- turnResult) {
 	results, err := oa.client.TakeTurn(ctx, func(p botapi.Ai_takeTurn_Params) error {
-		wb, err := p.NewBoard()
+		iwb, err := p.NewBoard()
+		if err != nil {
+			return err
+		}
+		wb, err := iwb.NewBoard()
 		if err != nil {
 			return err
 		}
 		wb.SetGameId(string(gid))
-		return b.ToWire(wb, faction)
+		return b.ToWireWithInitial(iwb, faction)
 	}).Struct()
 	var te turnError
 	if err != nil {

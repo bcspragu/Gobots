@@ -92,12 +92,11 @@ func NewRootAiConnector_connect_Results(s *capnp.Segment) (AiConnector_connect_R
 }
 
 func ReadRootAiConnector_connect_Results(msg *capnp.Message) (AiConnector_connect_Results, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return AiConnector_connect_Results{}, err
 	}
-	st := capnp.ToStruct(root)
-	return AiConnector_connect_Results{st}, nil
+	return AiConnector_connect_Results{root.Struct()}, nil
 }
 
 // AiConnector_connect_Results_List is a list of AiConnector_connect_Results.
@@ -146,28 +145,31 @@ func NewRootConnectRequest(s *capnp.Segment) (ConnectRequest, error) {
 }
 
 func ReadRootConnectRequest(msg *capnp.Message) (ConnectRequest, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return ConnectRequest{}, err
 	}
-	st := capnp.ToStruct(root)
-	return ConnectRequest{st}, nil
+	return ConnectRequest{root.Struct()}, nil
 }
 
 func (s ConnectRequest) Credentials() (Credentials, error) {
-	p, err := s.Struct.Pointer(0)
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
 		return Credentials{}, err
 	}
 
-	ss := capnp.ToStruct(p)
+	return Credentials{Struct: p.Struct()}, nil
 
-	return Credentials{Struct: ss}, nil
+}
+
+func (s ConnectRequest) HasCredentials() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
 }
 
 func (s ConnectRequest) SetCredentials(v Credentials) error {
 
-	return s.Struct.SetPointer(0, v.Struct)
+	return s.Struct.SetPtr(0, v.Struct.ToPtr())
 }
 
 // NewCredentials sets the credentials field to a newly
@@ -178,18 +180,22 @@ func (s ConnectRequest) NewCredentials() (Credentials, error) {
 	if err != nil {
 		return Credentials{}, err
 	}
-	err = s.Struct.SetPointer(0, ss)
+	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
 	return ss, err
 }
 
 func (s ConnectRequest) Ai() Ai {
-	p, err := s.Struct.Pointer(1)
+	p, err := s.Struct.Ptr(1)
 	if err != nil {
 
 		return Ai{}
 	}
-	c := capnp.ToInterface(p).Client()
-	return Ai{Client: c}
+	return Ai{Client: p.Interface().Client()}
+}
+
+func (s ConnectRequest) HasAi() bool {
+	p, err := s.Struct.Ptr(1)
+	return p.IsValid() || err != nil
 }
 
 func (s ConnectRequest) SetAi(v Ai) error {
@@ -203,7 +209,7 @@ func (s ConnectRequest) SetAi(v Ai) error {
 	if v.Client != nil {
 		in = capnp.NewInterface(seg, seg.Message().AddCap(v.Client))
 	}
-	return s.Struct.SetPointer(1, in)
+	return s.Struct.SetPtr(1, in.ToPtr())
 }
 
 // ConnectRequest_List is a list of ConnectRequest.
@@ -256,31 +262,35 @@ func NewRootCredentials(s *capnp.Segment) (Credentials, error) {
 }
 
 func ReadRootCredentials(msg *capnp.Message) (Credentials, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return Credentials{}, err
 	}
-	st := capnp.ToStruct(root)
-	return Credentials{st}, nil
+	return Credentials{root.Struct()}, nil
 }
 
 func (s Credentials) SecretToken() (string, error) {
-	p, err := s.Struct.Pointer(0)
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
 		return "", err
 	}
 
-	return capnp.ToText(p), nil
+	return p.Text(), nil
 
 }
 
+func (s Credentials) HasSecretToken() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
+}
+
 func (s Credentials) SecretTokenBytes() ([]byte, error) {
-	p, err := s.Struct.Pointer(0)
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
 		return nil, err
 	}
 
-	return capnp.ToData(p), nil
+	return p.Data(), nil
 
 }
 
@@ -290,26 +300,31 @@ func (s Credentials) SetSecretToken(v string) error {
 	if err != nil {
 		return err
 	}
-	return s.Struct.SetPointer(0, t)
+	return s.Struct.SetPtr(0, t.List.ToPtr())
 }
 
 func (s Credentials) BotName() (string, error) {
-	p, err := s.Struct.Pointer(1)
+	p, err := s.Struct.Ptr(1)
 	if err != nil {
 		return "", err
 	}
 
-	return capnp.ToText(p), nil
+	return p.Text(), nil
 
 }
 
+func (s Credentials) HasBotName() bool {
+	p, err := s.Struct.Ptr(1)
+	return p.IsValid() || err != nil
+}
+
 func (s Credentials) BotNameBytes() ([]byte, error) {
-	p, err := s.Struct.Pointer(1)
+	p, err := s.Struct.Ptr(1)
 	if err != nil {
 		return nil, err
 	}
 
-	return capnp.ToData(p), nil
+	return p.Data(), nil
 
 }
 
@@ -319,7 +334,7 @@ func (s Credentials) SetBotName(v string) error {
 	if err != nil {
 		return err
 	}
-	return s.Struct.SetPointer(1, t)
+	return s.Struct.SetPtr(1, t.List.ToPtr())
 }
 
 // Credentials_List is a list of Credentials.
@@ -428,39 +443,42 @@ func NewRootAi_takeTurn_Params(s *capnp.Segment) (Ai_takeTurn_Params, error) {
 }
 
 func ReadRootAi_takeTurn_Params(msg *capnp.Message) (Ai_takeTurn_Params, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return Ai_takeTurn_Params{}, err
 	}
-	st := capnp.ToStruct(root)
-	return Ai_takeTurn_Params{st}, nil
+	return Ai_takeTurn_Params{root.Struct()}, nil
 }
 
-func (s Ai_takeTurn_Params) Board() (Board, error) {
-	p, err := s.Struct.Pointer(0)
+func (s Ai_takeTurn_Params) Board() (InitialBoard, error) {
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
-		return Board{}, err
+		return InitialBoard{}, err
 	}
 
-	ss := capnp.ToStruct(p)
+	return InitialBoard{Struct: p.Struct()}, nil
 
-	return Board{Struct: ss}, nil
 }
 
-func (s Ai_takeTurn_Params) SetBoard(v Board) error {
+func (s Ai_takeTurn_Params) HasBoard() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
+}
 
-	return s.Struct.SetPointer(0, v.Struct)
+func (s Ai_takeTurn_Params) SetBoard(v InitialBoard) error {
+
+	return s.Struct.SetPtr(0, v.Struct.ToPtr())
 }
 
 // NewBoard sets the board field to a newly
-// allocated Board struct, preferring placement in s's segment.
-func (s Ai_takeTurn_Params) NewBoard() (Board, error) {
+// allocated InitialBoard struct, preferring placement in s's segment.
+func (s Ai_takeTurn_Params) NewBoard() (InitialBoard, error) {
 
-	ss, err := NewBoard(s.Struct.Segment())
+	ss, err := NewInitialBoard(s.Struct.Segment())
 	if err != nil {
-		return Board{}, err
+		return InitialBoard{}, err
 	}
-	err = s.Struct.SetPointer(0, ss)
+	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
 	return ss, err
 }
 
@@ -491,8 +509,8 @@ func (p Ai_takeTurn_Params_Promise) Struct() (Ai_takeTurn_Params, error) {
 	return Ai_takeTurn_Params{s}, err
 }
 
-func (p Ai_takeTurn_Params_Promise) Board() Board_Promise {
-	return Board_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
+func (p Ai_takeTurn_Params_Promise) Board() InitialBoard_Promise {
+	return InitialBoard_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
 }
 
 type Ai_takeTurn_Results struct{ capnp.Struct }
@@ -514,28 +532,31 @@ func NewRootAi_takeTurn_Results(s *capnp.Segment) (Ai_takeTurn_Results, error) {
 }
 
 func ReadRootAi_takeTurn_Results(msg *capnp.Message) (Ai_takeTurn_Results, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return Ai_takeTurn_Results{}, err
 	}
-	st := capnp.ToStruct(root)
-	return Ai_takeTurn_Results{st}, nil
+	return Ai_takeTurn_Results{root.Struct()}, nil
 }
 
 func (s Ai_takeTurn_Results) Turns() (Turn_List, error) {
-	p, err := s.Struct.Pointer(0)
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
 		return Turn_List{}, err
 	}
 
-	l := capnp.ToList(p)
+	return Turn_List{List: p.List()}, nil
 
-	return Turn_List{List: l}, nil
+}
+
+func (s Ai_takeTurn_Results) HasTurns() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
 }
 
 func (s Ai_takeTurn_Results) SetTurns(v Turn_List) error {
 
-	return s.Struct.SetPointer(0, v.List)
+	return s.Struct.SetPtr(0, v.List.ToPtr())
 }
 
 // Ai_takeTurn_Results_List is a list of Ai_takeTurn_Results.
@@ -584,31 +605,35 @@ func NewRootBoard(s *capnp.Segment) (Board, error) {
 }
 
 func ReadRootBoard(msg *capnp.Message) (Board, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return Board{}, err
 	}
-	st := capnp.ToStruct(root)
-	return Board{st}, nil
+	return Board{root.Struct()}, nil
 }
 
 func (s Board) GameId() (string, error) {
-	p, err := s.Struct.Pointer(1)
+	p, err := s.Struct.Ptr(1)
 	if err != nil {
 		return "", err
 	}
 
-	return capnp.ToText(p), nil
+	return p.Text(), nil
 
 }
 
+func (s Board) HasGameId() bool {
+	p, err := s.Struct.Ptr(1)
+	return p.IsValid() || err != nil
+}
+
 func (s Board) GameIdBytes() ([]byte, error) {
-	p, err := s.Struct.Pointer(1)
+	p, err := s.Struct.Ptr(1)
 	if err != nil {
 		return nil, err
 	}
 
-	return capnp.ToData(p), nil
+	return p.Data(), nil
 
 }
 
@@ -618,7 +643,7 @@ func (s Board) SetGameId(v string) error {
 	if err != nil {
 		return err
 	}
-	return s.Struct.SetPointer(1, t)
+	return s.Struct.SetPtr(1, t.List.ToPtr())
 }
 
 func (s Board) Width() uint16 {
@@ -640,19 +665,23 @@ func (s Board) SetHeight(v uint16) {
 }
 
 func (s Board) Robots() (Robot_List, error) {
-	p, err := s.Struct.Pointer(0)
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
 		return Robot_List{}, err
 	}
 
-	l := capnp.ToList(p)
+	return Robot_List{List: p.List()}, nil
 
-	return Robot_List{List: l}, nil
+}
+
+func (s Board) HasRobots() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
 }
 
 func (s Board) SetRobots(v Robot_List) error {
 
-	return s.Struct.SetPointer(0, v.List)
+	return s.Struct.SetPtr(0, v.List.ToPtr())
 }
 
 func (s Board) Round() int32 {
@@ -706,28 +735,31 @@ func NewRootInitialBoard(s *capnp.Segment) (InitialBoard, error) {
 }
 
 func ReadRootInitialBoard(msg *capnp.Message) (InitialBoard, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return InitialBoard{}, err
 	}
-	st := capnp.ToStruct(root)
-	return InitialBoard{st}, nil
+	return InitialBoard{root.Struct()}, nil
 }
 
 func (s InitialBoard) Board() (Board, error) {
-	p, err := s.Struct.Pointer(0)
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
 		return Board{}, err
 	}
 
-	ss := capnp.ToStruct(p)
+	return Board{Struct: p.Struct()}, nil
 
-	return Board{Struct: ss}, nil
+}
+
+func (s InitialBoard) HasBoard() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
 }
 
 func (s InitialBoard) SetBoard(v Board) error {
 
-	return s.Struct.SetPointer(0, v.Struct)
+	return s.Struct.SetPtr(0, v.Struct.ToPtr())
 }
 
 // NewBoard sets the board field to a newly
@@ -738,24 +770,28 @@ func (s InitialBoard) NewBoard() (Board, error) {
 	if err != nil {
 		return Board{}, err
 	}
-	err = s.Struct.SetPointer(0, ss)
+	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
 	return ss, err
 }
 
 func (s InitialBoard) Cells() (CellType_List, error) {
-	p, err := s.Struct.Pointer(1)
+	p, err := s.Struct.Ptr(1)
 	if err != nil {
 		return CellType_List{}, err
 	}
 
-	l := capnp.ToList(p)
+	return CellType_List{List: p.List()}, nil
 
-	return CellType_List{List: l}, nil
+}
+
+func (s InitialBoard) HasCells() bool {
+	p, err := s.Struct.Ptr(1)
+	return p.IsValid() || err != nil
 }
 
 func (s InitialBoard) SetCells(v CellType_List) error {
 
-	return s.Struct.SetPointer(1, v.List)
+	return s.Struct.SetPtr(1, v.List.ToPtr())
 }
 
 // InitialBoard_List is a list of InitialBoard.
@@ -804,12 +840,11 @@ func NewRootRobot(s *capnp.Segment) (Robot, error) {
 }
 
 func ReadRootRobot(msg *capnp.Message) (Robot, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return Robot{}, err
 	}
-	st := capnp.ToStruct(root)
-	return Robot{st}, nil
+	return Robot{root.Struct()}, nil
 }
 
 func (s Robot) Id() uint32 {
@@ -899,31 +934,35 @@ func NewRootReplay(s *capnp.Segment) (Replay, error) {
 }
 
 func ReadRootReplay(msg *capnp.Message) (Replay, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return Replay{}, err
 	}
-	st := capnp.ToStruct(root)
-	return Replay{st}, nil
+	return Replay{root.Struct()}, nil
 }
 
 func (s Replay) GameId() (string, error) {
-	p, err := s.Struct.Pointer(0)
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
 		return "", err
 	}
 
-	return capnp.ToText(p), nil
+	return p.Text(), nil
 
 }
 
+func (s Replay) HasGameId() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
+}
+
 func (s Replay) GameIdBytes() ([]byte, error) {
-	p, err := s.Struct.Pointer(0)
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
 		return nil, err
 	}
 
-	return capnp.ToData(p), nil
+	return p.Data(), nil
 
 }
 
@@ -933,23 +972,27 @@ func (s Replay) SetGameId(v string) error {
 	if err != nil {
 		return err
 	}
-	return s.Struct.SetPointer(0, t)
+	return s.Struct.SetPtr(0, t.List.ToPtr())
 }
 
 func (s Replay) Initial() (InitialBoard, error) {
-	p, err := s.Struct.Pointer(1)
+	p, err := s.Struct.Ptr(1)
 	if err != nil {
 		return InitialBoard{}, err
 	}
 
-	ss := capnp.ToStruct(p)
+	return InitialBoard{Struct: p.Struct()}, nil
 
-	return InitialBoard{Struct: ss}, nil
+}
+
+func (s Replay) HasInitial() bool {
+	p, err := s.Struct.Ptr(1)
+	return p.IsValid() || err != nil
 }
 
 func (s Replay) SetInitial(v InitialBoard) error {
 
-	return s.Struct.SetPointer(1, v.Struct)
+	return s.Struct.SetPtr(1, v.Struct.ToPtr())
 }
 
 // NewInitial sets the initial field to a newly
@@ -960,24 +1003,28 @@ func (s Replay) NewInitial() (InitialBoard, error) {
 	if err != nil {
 		return InitialBoard{}, err
 	}
-	err = s.Struct.SetPointer(1, ss)
+	err = s.Struct.SetPtr(1, ss.Struct.ToPtr())
 	return ss, err
 }
 
 func (s Replay) Rounds() (Replay_Round_List, error) {
-	p, err := s.Struct.Pointer(2)
+	p, err := s.Struct.Ptr(2)
 	if err != nil {
 		return Replay_Round_List{}, err
 	}
 
-	l := capnp.ToList(p)
+	return Replay_Round_List{List: p.List()}, nil
 
-	return Replay_Round_List{List: l}, nil
+}
+
+func (s Replay) HasRounds() bool {
+	p, err := s.Struct.Ptr(2)
+	return p.IsValid() || err != nil
 }
 
 func (s Replay) SetRounds(v Replay_Round_List) error {
 
-	return s.Struct.SetPointer(2, v.List)
+	return s.Struct.SetPtr(2, v.List.ToPtr())
 }
 
 // Replay_List is a list of Replay.
@@ -1026,44 +1073,51 @@ func NewRootReplay_Round(s *capnp.Segment) (Replay_Round, error) {
 }
 
 func ReadRootReplay_Round(msg *capnp.Message) (Replay_Round, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return Replay_Round{}, err
 	}
-	st := capnp.ToStruct(root)
-	return Replay_Round{st}, nil
+	return Replay_Round{root.Struct()}, nil
 }
 
 func (s Replay_Round) Moves() (Turn_List, error) {
-	p, err := s.Struct.Pointer(0)
+	p, err := s.Struct.Ptr(0)
 	if err != nil {
 		return Turn_List{}, err
 	}
 
-	l := capnp.ToList(p)
+	return Turn_List{List: p.List()}, nil
 
-	return Turn_List{List: l}, nil
+}
+
+func (s Replay_Round) HasMoves() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
 }
 
 func (s Replay_Round) SetMoves(v Turn_List) error {
 
-	return s.Struct.SetPointer(0, v.List)
+	return s.Struct.SetPtr(0, v.List.ToPtr())
 }
 
 func (s Replay_Round) EndBoard() (Board, error) {
-	p, err := s.Struct.Pointer(1)
+	p, err := s.Struct.Ptr(1)
 	if err != nil {
 		return Board{}, err
 	}
 
-	ss := capnp.ToStruct(p)
+	return Board{Struct: p.Struct()}, nil
 
-	return Board{Struct: ss}, nil
+}
+
+func (s Replay_Round) HasEndBoard() bool {
+	p, err := s.Struct.Ptr(1)
+	return p.IsValid() || err != nil
 }
 
 func (s Replay_Round) SetEndBoard(v Board) error {
 
-	return s.Struct.SetPointer(1, v.Struct)
+	return s.Struct.SetPtr(1, v.Struct.ToPtr())
 }
 
 // NewEndBoard sets the endBoard field to a newly
@@ -1074,7 +1128,7 @@ func (s Replay_Round) NewEndBoard() (Board, error) {
 	if err != nil {
 		return Board{}, err
 	}
-	err = s.Struct.SetPointer(1, ss)
+	err = s.Struct.SetPtr(1, ss.Struct.ToPtr())
 	return ss, err
 }
 
@@ -1206,12 +1260,11 @@ func NewRootTurn(s *capnp.Segment) (Turn, error) {
 }
 
 func ReadRootTurn(msg *capnp.Message) (Turn, error) {
-	root, err := msg.Root()
+	root, err := msg.RootPtr()
 	if err != nil {
 		return Turn{}, err
 	}
-	st := capnp.ToStruct(root)
-	return Turn{st}, nil
+	return Turn{root.Struct()}, nil
 }
 
 func (s Turn) Which() Turn_Which {
