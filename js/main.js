@@ -1,4 +1,6 @@
 $(function() {
+  $('.selectpicker').selectpicker();
+
   $.fn.registerAjaxForm = function(callback) {
     if (!this.hasClass('ajax-form')) {
       return;

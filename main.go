@@ -42,7 +42,8 @@ func main() {
 	http.HandleFunc("/createUser", baseWrapper(createUserHandler))
 	http.HandleFunc("/login", baseWrapper(loginHandler))
 	http.HandleFunc("/logout", baseWrapper(logoutHandler))
-	http.HandleFunc("/bots", baseWrapper(botHandler))
+	http.HandleFunc("/bots", baseWrapper(botsHandler))
+	http.HandleFunc("/bot/", baseWrapper(botHandler))
 	http.HandleFunc("/game/", noUserWrapper(serveGame))
 	http.HandleFunc("/startMatch", baseWrapper(requireLogin(startMatch)))
 
@@ -264,7 +265,7 @@ func createUserHandler(c context) error {
 	return nil
 }
 
-func botHandler(c context) error {
+func botsHandler(c context) error {
 	dir, err := db.loadDirectory()
 	if err != nil {
 		return err
@@ -283,4 +284,8 @@ func botHandler(c context) error {
 		},
 	}
 	return templates.ExecuteTemplate(c, "bots.html", data)
+}
+
+func botHandler(c context) error {
+	return nil
 }

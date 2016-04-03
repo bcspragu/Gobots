@@ -35,29 +35,37 @@
   <p>
   </p>
 {{end}}
-<h2 class="splash-subhead">Bots Online</h2>
 {{ if .Data.Bots }}
-  {{ range $bot := .Data.Bots }}
-    <div class="bots">{{ $bot.Info.Name }}</div>
-  {{ end }}
-{{ else }}
-  <div>No bots are currently registered.</div>
-{{ end }}
+<div class="row">
+  <div class="col-md-6 option-section">
+    <div class="option-container">
+      <h2 class="subheader">Bots Online</h2>
+      <p>These bots are all currently connected to the server.</p>
+      {{ range $bot := .Data.Bots }}
+        <a href="/bot/{{ $bot.Info.ID}}">{{ $bot.Info.Name }}</a>
+      {{ end }}
+    </div>
+  </div>
 
-{{ if .Data.Bots }}
-  <h2 class="splash-subhead">Fight Bots</h2>
-  <form class="pure-form fight-bot" method="POST" action="/startMatch">
-      <select name="ai1">
-        {{ range $bot := .Data.Bots }}
-          <option value="{{ $bot.Info.ID }}">{{ $bot.Info.Name }}</option>
-        {{ end }}
-      </select>
-      <span class="vs">vs</span>
-      <select name="ai2">
-        {{ range $bot := .Data.Bots }}
-          <option value="{{ $bot.Info.ID }}">{{ $bot.Info.Name }}</option>
-        {{ end }}
-      </select>
-      <div><button type="submit" class="pure-button pure-button-primary fight-btn">Fight</button></div>
-  </form>
+  <div class="col-md-6 option-section">
+    <div class="option-container">
+      <h2 class="subheader">Fight Bots</h2>
+      <p>Pick two bots from the list, and watch them fight it out.</p>
+      <form class="pure-form fight-bot" method="POST" action="/startMatch">
+          <select class="selectpicker" name="ai1">
+            {{ range $bot := .Data.Bots }}
+              <option value="{{ $bot.Info.ID }}">{{ $bot.Info.Name }}</option>
+            {{ end }}
+          </select>
+          <span class="vs">vs</span>
+          <select class="selectpicker" name="ai2">
+            {{ range $bot := .Data.Bots }}
+              <option value="{{ $bot.Info.ID }}">{{ $bot.Info.Name }}</option>
+            {{ end }}
+          </select>
+          <button type="submit" class="fight-btn btn btn-default">Fight</button>
+      </form>
+    </div>
+  </div>
+</div>
 {{ end }}

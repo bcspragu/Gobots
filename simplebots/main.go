@@ -2,14 +2,18 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
+	"os"
 
 	"github.com/bcspragu/Gobots/game"
 )
 
-var botName = flag.String("bot_name", "aggro", "which bot to use")
+var flags = flag.NewFlagSet("program flags", flag.ContinueOnError)
+var botName = flags.String("bot_name", "aggro", "which bot to use")
 
 func main() {
-	flag.Parse()
+	flags.SetOutput(ioutil.Discard)
+	flags.Parse(os.Args[1:])
 	code := "IAqDpTlpWCfYnRvUflMpIZdwU"
 	var g game.AI
 

@@ -29,3 +29,7 @@ func (c *context) Write(s string) {
 func (c *context) gameID() gameID {
 	return gameID(strings.Split(c.r.URL.Path, "/")[2])
 }
+
+func (c *context) botID() aiID {
+	return aiID(strings.Split(c.r.URL.Path, "/")[2])
+}

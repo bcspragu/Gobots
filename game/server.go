@@ -1,15 +1,25 @@
 package game
 
 import (
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/bcspragu/Gobots/botapi"
 	"golang.org/x/net/context"
 	"zombiezen.com/go/capnproto2/rpc"
+)
+
+var (
+	flags         = flag.NewFlagSet("game flags", flag.ContinueOnError)
+	serverAddress = flags.String("server_address", "localhost:8001", "address of API server")
+	retryInterval = flags.Duration("retry_interval", 10*time.Second, "how often (in seconds) to retry connecting to the server after losing a connection")
 )
 
 // Client represents a connection to the game server.
@@ -62,28 +72,78 @@ func (c *Client) RegisterAI(name, token string, factory Factory) error {
 	return err
 }
 
-func StartServerForFactory(name, token string, factory Factory) {
-	c, err := Dial("localhost:8001")
+// connect wraps the Dial and RegisterAI functionality
+func connect(name, token string, factory Factory) (*Client, error) {
+	c, err := Dial(*serverAddress)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "dial:", err)
-		os.Exit(exitFail)
+		return c, fmt.Errorf("Failed to connect to server: %v", err)
 	}
 	if err = c.RegisterAI(name, token, factory); err != nil {
-		fmt.Fprintln(os.Stderr, "register:", err)
+		return c, fmt.Errorf("Failed to register bot: %v", err)
+	}
+	return c, err
+}
+
+// StartServerForFactory connects to the server with the given robot name and
+// user token, and registers the robot provided by the factory function
+func StartServerForFactory(name, token string, factory Factory) {
+	flags.SetOutput(ioutil.Discard)
+	flags.Parse(os.Args[1:])
+
+	c, err := connect(name, token, factory)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(exitFail)
 	}
-	fmt.Fprintf(os.Stderr, "Connected bot %s. Ctrl-C or send SIGINT to disconnect.", name)
+	fmt.Fprintf(os.Stderr, "Connected bot %s. Ctrl-C or send SIGINT to disconnect.\n", name)
+	connChan := make(chan struct{})
+	cWait := func() {
+		c.conn.Wait()
+		connChan <- struct{}{}
+	}
+	go cWait()
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGQUIT)
-	<-sig
+
+	// Wait for either our connection with the server to terminate, or the user
+	// to mercilessly silence their bot.
+loop:
+	for {
+		select {
+		case <-connChan:
+			fmt.Fprintln(os.Stderr, "Lost connection to server, trying to reconnect...")
+			c, err = connect(name, token, factory)
+			for err != nil {
+				if strings.Contains(err.Error(), "connection refused") {
+					// If we can't connect, just wait ten (or --retry_interval) seconds and try again
+				} else {
+					// Fail on all other errors, like the server saying you have an invalid token
+					fmt.Fprintln(os.Stderr, err)
+					os.Exit(exitFail)
+				}
+				<-time.After(*retryInterval)
+				fmt.Fprintln(os.Stderr, "Trying to reconnect...")
+				c, err = connect(name, token, factory)
+			}
+			fmt.Fprintf(os.Stderr, "Reconnected bot %s successfully!\n", name)
+			// Wait for the connection to end again
+			go cWait()
+		case <-sig:
+			signal.Stop(sig)
+			break loop
+		}
+	}
+
 	signal.Stop(sig)
 	fmt.Fprintln(os.Stderr, "Interrupted. Quitting...")
 	if err := c.Close(); err != nil {
-		fmt.Fprintln(os.Stderr, "close:", err)
+		fmt.Fprintln(os.Stderr, "Error closing our connection:", err)
 		os.Exit(exitFail)
 	}
 }
 
+// StartServerForBot connects to the server with the given robot name and user
+// token, and registers the robot provided
 func StartServerForBot(name, token string, ai AI) {
 	factory := func(gameID string) AI {
 		return ai
