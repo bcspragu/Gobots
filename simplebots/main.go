@@ -24,6 +24,8 @@ func main() {
 		g = random{}
 	case "pathfinder":
 		g = &pathfinder{}
+	case "sunguard":
+		g = sunguard{}
 	}
 	game.StartServerForBot(*botName, code, g)
 }

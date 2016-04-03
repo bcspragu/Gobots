@@ -549,3 +549,10 @@ type Loc struct {
 func (loc Loc) String() string {
 	return fmt.Sprintf("(%d, %d)", loc.X, loc.Y)
 }
+
+func absFloat(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

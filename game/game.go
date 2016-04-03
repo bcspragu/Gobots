@@ -89,6 +89,7 @@ type Direction int
 
 // The defined directions.
 const (
+	None  = Direction(-1)
 	North = Direction(botapi.Direction_north)
 	South = Direction(botapi.Direction_south)
 	East  = Direction(botapi.Direction_east)
