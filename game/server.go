@@ -96,10 +96,10 @@ func StartServerForFactory(name, token string, factory Factory) {
 		os.Exit(exitFail)
 	}
 	fmt.Fprintf(os.Stderr, "Connected bot %s. Ctrl-C or send SIGINT to disconnect.\n", name)
-	connChan := make(chan struct{})
+	retryChan := make(chan time.Time)
 	cWait := func() {
 		c.conn.Wait()
-		connChan <- struct{}{}
+		retryChan <- time.Now()
 	}
 	go cWait()
 	sig := make(chan os.Signal, 1)
@@ -110,24 +110,25 @@ func StartServerForFactory(name, token string, factory Factory) {
 loop:
 	for {
 		select {
-		case <-connChan:
+		case <-retryChan:
 			fmt.Fprintln(os.Stderr, "Lost connection to server, trying to reconnect...")
 			c, err = connect(name, token, factory)
-			for err != nil {
+			if err == nil {
+				fmt.Fprintf(os.Stderr, "Reconnected bot %s successfully!\n", name)
+				// Wait until we lose the connection again
+				go cWait()
+			} else {
 				if strings.Contains(err.Error(), "connection refused") {
 					// If we can't connect, just wait ten (or --retry_interval) seconds and try again
+					go func() {
+						retryChan <- <-time.After(*retryInterval)
+					}()
 				} else {
 					// Fail on all other errors, like the server saying you have an invalid token
 					fmt.Fprintln(os.Stderr, err)
 					os.Exit(exitFail)
 				}
-				<-time.After(*retryInterval)
-				fmt.Fprintln(os.Stderr, "Trying to reconnect...")
-				c, err = connect(name, token, factory)
 			}
-			fmt.Fprintf(os.Stderr, "Reconnected bot %s successfully!\n", name)
-			// Wait for the connection to end again
-			go cWait()
 		case <-sig:
 			signal.Stop(sig)
 			break loop
@@ -136,9 +137,11 @@ loop:
 
 	signal.Stop(sig)
 	fmt.Fprintln(os.Stderr, "Interrupted. Quitting...")
-	if err := c.Close(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error closing our connection:", err)
-		os.Exit(exitFail)
+	if c != nil {
+		if err := c.Close(); err != nil {
+			fmt.Fprintln(os.Stderr, "Error closing our connection:", err)
+			os.Exit(exitFail)
+		}
 	}
 }
 

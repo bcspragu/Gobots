@@ -17,7 +17,7 @@
   {{ range $aiID, $ai := $dir.AIs }}
     <tr>
       {{ $stat := index $stats $aiID }}
-      <td>{{$ai.Name}}{{if index $on $aiID}} (Online Now){{end}}</td>
+      <td><a href="/bot/{{$aiID}}">{{$ai.Name}}</a>{{if index $on $aiID}} (Online Now){{end}}</td>
       <td>{{ index $users $ai.UserID }}</td>
       <td>{{ $stat.Wins }}</td>
       <td>{{ $stat.Losses }}</td>

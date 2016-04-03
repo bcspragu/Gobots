@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -41,13 +43,14 @@ type datastore interface {
 	listAIsForUser(a accessToken) ([]*aiInfo, error)
 	lookupAI(id aiID) (*aiInfo, error)
 	loadDirectory() (*directory, error)
+	matchHistory(id aiID) ([]*gameInfo, error)
 
 	// Games
 	startGame(ai1, ai2 aiID, init botapi.InitialBoard) (gameID, error)
 	addRound(id gameID, round botapi.Replay_Round) error
 	lookupGame(id gameID) (botapi.Replay, error)
 	lookupGameInfo(id gameID) (*gameInfo, error)
-	finishGame(id gameID, p1, p2 *aiInfo, w WinType) error
+	finishGame(id gameID, p1, p2 *aiInfo, info *gameInfo) error
 }
 
 type dbImpl struct {
@@ -90,6 +93,22 @@ type directory struct {
 	AIStats   map[aiID]*aiStats
 }
 
+func (d *directory) String() string {
+	var buf bytes.Buffer
+	for id, username := range d.Usernames {
+		buf.WriteString(fmt.Sprintf("%s: %s\n", id, username))
+	}
+
+	for id, ai := range d.AIs {
+		buf.WriteString(fmt.Sprintf("%s: %v\n", id, ai))
+	}
+
+	for id, ai := range d.AIStats {
+		buf.WriteString(fmt.Sprintf("%s: %v\n", id, ai))
+	}
+	return buf.String()
+}
+
 type (
 	accessToken string
 	uID         string
@@ -112,8 +131,30 @@ type aiInfo struct {
 }
 
 type gameInfo struct {
-	AI1 *aiInfo
-	AI2 *aiInfo
+	AI1       *aiInfo
+	AI2       *aiInfo
+	AI1Score  int
+	AI2Score  int
+	StartTime time.Time
+	EndTime   time.Time
+}
+
+// ByTime implements sort.Interface for a []*gameInfo based on the StartTime
+// field
+type ByTime []*gameInfo
+
+func (g ByTime) Len() int           { return len(g) }
+func (g ByTime) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
+func (g ByTime) Less(i, j int) bool { return g[i].StartTime.Unix() > g[j].StartTime.Unix() }
+
+func (g *gameInfo) GameResult() WinType {
+	switch {
+	case g.AI1Score > g.AI2Score:
+		return P1Win
+	case g.AI1Score < g.AI2Score:
+		return P2Win
+	}
+	return Tie
 }
 
 type aiStats struct {
@@ -288,6 +329,29 @@ func (db *dbImpl) loadDirectory() (*directory, error) {
 	return dir, err
 }
 
+func (db *dbImpl) matchHistory(id aiID) ([]*gameInfo, error) {
+	var gInfos []*gameInfo
+	err := db.View(func(tx *bolt.Tx) error {
+		// Load GameInfos
+		b := tx.Bucket(GameInfoBucket)
+		return b.ForEach(func(k, v []byte) error {
+			var g gameInfo
+			buf := bytes.NewReader(v)
+			dec := gob.NewDecoder(buf)
+
+			if err := dec.Decode(&g); err != nil {
+				return err
+			}
+			if g.AI1.ID == id || g.AI2.ID == id {
+				gInfos = append(gInfos, &g)
+			}
+			return nil
+		})
+	})
+	sort.Sort(ByTime(gInfos))
+	return gInfos, err
+}
+
 // Games
 func (db *dbImpl) startGame(ai1, ai2 aiID, init botapi.InitialBoard) (gameID, error) {
 	var gID gameID
@@ -422,41 +486,40 @@ func (db *dbImpl) lookupGameInfo(id gameID) (*gameInfo, error) {
 
 // When we finish a game, we want to increment the win count of the winner and
 // the lose count of the loser, and make a game info entry
-func (db *dbImpl) finishGame(id gameID, p1, p2 *aiInfo, w WinType) error {
+func (db *dbImpl) finishGame(id gameID, p1, p2 *aiInfo, info *gameInfo) error {
 	err := db.Update(func(tx *bolt.Tx) error {
-		p1Stat, err := aiStat(tx, p1.ID)
-		if err != nil {
-			return err
-		}
+		// Only update the stats if the bot didn't fight itself
+		if p1.ID != p2.ID {
+			p1Stat, err := aiStat(tx, p1.ID)
+			if err != nil {
+				return err
+			}
 
-		p2Stat, err := aiStat(tx, p2.ID)
-		if err != nil {
-			return err
-		}
+			p2Stat, err := aiStat(tx, p2.ID)
+			if err != nil {
+				return err
+			}
 
-		switch w {
-		case P1Win:
-			p1Stat.Wins++
-			p2Stat.Losses++
-		case P2Win:
-			p1Stat.Losses++
-			p2Stat.Wins++
-		case Tie:
-			p1Stat.Ties++
-			p2Stat.Ties++
-		}
+			switch info.GameResult() {
+			case P1Win:
+				p1Stat.Wins++
+				p2Stat.Losses++
+			case P2Win:
+				p1Stat.Losses++
+				p2Stat.Wins++
+			case Tie:
+				p1Stat.Ties++
+				p2Stat.Ties++
+			}
 
-		if err := writeAiStats(tx, p1.ID, p1Stat); err != nil {
-			return err
+			if err := writeAiStats(tx, p1.ID, p1Stat); err != nil {
+				return err
+			}
+			if err := writeAiStats(tx, p2.ID, p2Stat); err != nil {
+				return err
+			}
 		}
-		if err := writeAiStats(tx, p2.ID, p2Stat); err != nil {
-			return err
-		}
-		g := &gameInfo{
-			AI1: p1,
-			AI2: p2,
-		}
-		return writeGameInfo(tx, id, g)
+		return writeGameInfo(tx, id, info)
 	})
 	return err
 }

@@ -1,0 +1,26 @@
+{{ $dir := .Data.Directory }}
+{{ $hist := .Data.History }}
+{{ $users := $dir.Usernames}}
+{{ $ais := $dir.AIs}}
+<h1>Bot {{(index $dir.AIs .Data.ID).Name}} Match History</h1>
+<table class="table">
+  <thead>
+  <tr>
+    <th>Bot 1</th>
+    <th>Bot 2</th>
+    <th>Final Score</th>
+    <th>Date</th>
+  </tr>
+  </thead>
+  <tbody>
+  {{ range $info := $hist }}
+    <tr>
+      <td>{{(index $ais $info.AI1.ID).Name}}</td>
+      <td>{{(index $ais $info.AI2.ID).Name}}</td>
+      <td>{{$info.AI1Score}} - {{$info.AI2Score}}</td>
+      <td>{{ $info.StartTime }}</td>
+    </tr>
+  {{ end }}
+  </tbody>
+</table>
+

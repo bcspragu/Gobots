@@ -142,6 +142,7 @@ func (aic *aiConnector) drop() {
 }
 
 func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB *onlineAI) error {
+	sTime := time.Now()
 	// Create new board and store it.
 	b := engine.EmptyBoard(BoardSize, BoardSize)
 	// TODO: Have the user choose this
@@ -207,15 +208,15 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 		db.addRound(gid, r)
 	}
 
-	wt := Tie
-	p1B, p2B := b.BotCount(1), b.BotCount(2)
-	if p1B > p2B {
-		wt = P1Win
-	} else if p1B < p2B {
-		wt = P2Win
+	gInfo := &gameInfo{
+		AI1:       &aiA.Info,
+		AI2:       &aiB.Info,
+		AI1Score:  b.BotCount(1),
+		AI2Score:  b.BotCount(2),
+		StartTime: sTime,
+		EndTime:   time.Now(),
 	}
-
-	return db.finishGame(gid, &aiA.Info, &aiB.Info, wt)
+	return db.finishGame(gid, &aiA.Info, &aiB.Info, gInfo)
 }
 
 type onlineAI struct {

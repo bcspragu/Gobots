@@ -290,5 +290,22 @@ func botsHandler(c context) error {
 }
 
 func botHandler(c context) error {
-	return nil
+	dir, err := db.loadDirectory()
+	if err != nil {
+		return err
+	}
+
+	matches, err := db.matchHistory(c.botID())
+	if err != nil {
+		return err
+	}
+
+	data := tmplData{
+		Data: map[string]interface{}{
+			"History":   matches,
+			"Directory": dir,
+			"ID":        c.botID(),
+		},
+	}
+	return templates.ExecuteTemplate(c, "bot.html", data)
 }

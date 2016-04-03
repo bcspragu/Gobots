@@ -37,17 +37,7 @@
 {{end}}
 {{ if .Data.Bots }}
 <div class="row">
-  <div class="col-md-6 option-section">
-    <div class="option-container">
-      <h2 class="subheader">Bots Online</h2>
-      <p>These bots are all currently connected to the server.</p>
-      {{ range $bot := .Data.Bots }}
-        <a href="/bot/{{ $bot.Info.ID}}">{{ $bot.Info.Name }}</a>
-      {{ end }}
-    </div>
-  </div>
-
-  <div class="col-md-6 option-section">
+  <div class="col-md-offset-3 col-md-6">
     <div class="option-container">
       <h2 class="subheader">Fight Bots</h2>
       <p>Pick two bots from the list, and watch them fight it out.</p>

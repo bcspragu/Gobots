@@ -14,7 +14,7 @@ var botName = flags.String("bot_name", "aggro", "which bot to use")
 func main() {
 	flags.SetOutput(ioutil.Discard)
 	flags.Parse(os.Args[1:])
-	code := "IAqDpTlpWCfYnRvUflMpIZdwU"
+	code := "HAXWUumlfiJekSXfwAHQlttHH"
 	var g game.AI
 
 	switch *botName {
