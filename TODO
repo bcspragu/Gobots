@@ -1,19 +1,4 @@
--Implement new flow [In Progress]
 -Add methods for even easier usage of AI package [In Progress]
-
+-Handle disconnect error cases better [Next on the hit list]
 -Move 3rd party things to third_party
--Handle disconnect error cases better
--Add in support for guard, functions like RobotGame in Python
--Finish adding BotName as a part of the credential check
--Make tokens per user, not per bot
--See if aiFactory can be simplified
-
-New Flow:
-
-1. User registers username and is given unique token (NOT BASED ON THEIR NAME)
-  a. User is instructed not to lose the token, because they can’t get it back
-2. User creates bot, implementing Action(board, bot) 
-3. User calls StartRobotServer(name, token, aiFactory)
-
-New flow doesn't involve GitHub, usernames are first come, first serve, users
-can be limited to a certain number of bots, probably 10
+-Add conn.Wait() call in goroutine, followed by a new signaling channel. This way you can try to reconnect on failure
