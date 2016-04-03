@@ -37,6 +37,11 @@ struct Board {
   round @3 :Int32;
 }
 
+struct InitialBoard {
+  board @0 :Board;
+  cells @1 :List(CellType);
+}
+
 struct Robot {
   id @0 :RobotId;
   x @1 :UInt16;
@@ -47,7 +52,7 @@ struct Robot {
 
 struct Replay {
   gameId @0 :Text;
-  initialBoard @1 :Board;
+  initial @1 :InitialBoard;
   rounds @2 :List(Round);
   
   struct Round {
@@ -85,4 +90,10 @@ enum Direction {
   south @1;
   east @2;
   west @3;
+}
+
+enum CellType {
+  invalid @0;
+  valid @1;
+  spawn @2;
 }

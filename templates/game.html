@@ -1,12 +1,18 @@
 {{ if .Data.Exists }}
-  <div ng-controller="GameController as game">
-    <h1 class="header">Round [[game.round]]</h1>
+  <div ng-app="gobotApp" ng-cloak ng-controller="GameController as game">
+    <h1 class="header">Round [[game.round + 1]]</h1>
+    <div class="row">
+      <div class="text-left col-xs-3 col-xs-offset-3 red score">{{.Data.P1Name}}: [[game.board.BotCount(1)]]</div>
+      <div class="text-right col-xs-3 blue score">{{.Data.P2Name}}: [[game.board.BotCount(2)]]</div>
+    </div>
     <div class="row">
       <div class="gameBoardContainer col-centered">
         <div class="gameBoard">
           <div class="row" ng-repeat="row in game.rows track by $index">
-            <div class="cell" ng-repeat="cell in row track by $index" ng-class="{gopher: cell.Bot !== null, invalid: cell.CellType == 1}">
-              <img class="go-img" ng-src="[[cell.Bot.Faction == 1 ? '/img/gopher.jpg' : '/img/gopher2.jpg']]" ng-show="cell.Bot !== null"></div>
+            <div class="cell" ng-repeat="cell in row track by $index" ng-class="{gopher: cell.Bot !== null, invalid: cell.CellType == 0, spawn: cell.CellType == 2}">
+              <div class="gobot" ng-class="{red: cell.Bot.Faction == 1, blue: cell.Bot.Faction == 2}" ng-show="cell.Bot !== null">
+                [[ cell.Bot.Health ]]
+              </div>
             </div>
           </div>
         </div>
@@ -14,7 +20,7 @@
     </div>
   </div>
 {{ else }}
-  <h1 class="Header">Game Not Found</h1>
+  <h1 class="header">Game Not Found</h1>
   <h2 class="subheader">
     ID {{ .Data.GameID }} doesn't exist
   </h2>
@@ -24,5 +30,5 @@
 <script>
   // This is probably (hopefully) escaped by Go's templating system
   var GameID = "{{ .Data.GameID }}";
-  var replayStr = "{{ .Data.ReplayString }}";
+  var replayStr = "{{ .Data.Playback }}";
 </script>

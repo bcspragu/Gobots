@@ -1,10 +1,15 @@
 package main
 
-import "github.com/bcspragu/Gobots/game"
+import (
+	"log"
+
+	"github.com/bcspragu/Gobots/game"
+)
 
 type aggro struct{}
 
 func (aggro) Act(b *game.Board, r *game.Robot) game.Action {
+	log.Printf("Aggro making moves")
 	ds := []game.Direction{
 		game.North,
 		game.South,

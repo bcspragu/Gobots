@@ -1,0 +1,28 @@
+<h1>Bot List</h1>
+<table class="table">
+  <thead>
+  <tr>
+    <th>Bot</th>
+    <th>Owner</th>
+    <th>Wins</th>
+    <th>Losses</th>
+    <th>Ties</th>
+  </tr>
+  </thead>
+  {{ $on := .Data.Online}}
+  {{ $dir := .Data.Directory }}
+  {{ $users := $dir.Usernames}}
+  {{ $stats := $dir.AIStats}}
+  <tbody>
+  {{ range $aiID, $ai := $dir.AIs }}
+    <tr>
+      {{ $stat := index $stats $aiID }}
+      <td>{{$ai.Name}}{{if index $on $aiID}} (Online Now){{end}}</td>
+      <td>{{ index $users $ai.UserID }}</td>
+      <td>{{ $stat.Wins }}</td>
+      <td>{{ $stat.Losses }}</td>
+      <td>{{ $stat.Ties }}</td>
+    </tr>
+  {{ end }}
+  </tbody>
+</table>

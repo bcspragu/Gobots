@@ -3,7 +3,6 @@ package engine
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"strconv"
 
 	"github.com/bcspragu/Gobots/botapi"
@@ -24,16 +23,18 @@ const (
 )
 
 type (
-	SpawnFunc func(Loc) bool
+	Spawner interface {
+		// Given a list of possible spawn locations for the first player, return a
+		// list of locations to spawn players. The program will automatically
+		// mirror the spawn locations for the other faction.
+		Spawn(locs []Loc) []Loc
+	}
 
+	// CellInfo holds info about a which robot is in a cell and what type of cell
+	// it is
 	CellInfo struct {
 		Bot      *Robot
 		CellType CellType
-	}
-
-	LocPair struct {
-		L Loc
-		B *Robot
 	}
 
 	CellType   int
@@ -57,31 +58,28 @@ const (
 )
 
 const (
-	UnknownCellType CellType = iota
-	Invalid
+	Invalid CellType = iota
 	Valid
+	Spawn
 )
 
 var (
-	all SpawnFunc = func(loc Loc) bool {
-		return true
-	}
-
-	everyOther SpawnFunc = func(loc Loc) bool {
-		return loc.Y%2 == 0
-	}
-
-	randomSpawnFuncGen = func(b *Board) SpawnFunc {
-		r := rand.Perm(b.Size.Y)
-		return func(loc Loc) bool {
-			return r[loc.Y]%2 == 0
-		}
-	}
-
 	damageMap = map[DamageType]int{
 		Collision: CollisionDamage,
 		Attack:    AttackDamage,
 		Destruct:  DestructDamage,
+	}
+
+	cellToWire = map[CellType]botapi.CellType{
+		Invalid: botapi.CellType_invalid,
+		Valid:   botapi.CellType_valid,
+		Spawn:   botapi.CellType_spawn,
+	}
+
+	cellFromWire = map[botapi.CellType]CellType{
+		botapi.CellType_invalid: Invalid,
+		botapi.CellType_valid:   Valid,
+		botapi.CellType_spawn:   Spawn,
 	}
 )
 
@@ -93,6 +91,20 @@ type Board struct {
 	Round int
 
 	NextID RobotID
+
+	s Spawner
+	c Typer
+
+	leftSpawns []Loc
+}
+
+func (b *Board) BotCount(faction int) (n int) {
+	for _, bot := range b.Locs {
+		if bot.Faction == faction {
+			n++
+		}
+	}
+	return
 }
 
 func (b *Board) CellsJS() [][]CellType {
@@ -101,9 +113,10 @@ func (b *Board) CellsJS() [][]CellType {
 
 // EmptyBoard creates an empty board of the given size.
 func EmptyBoard(w, h int) *Board {
+	size := Loc{w, h}
 	b := &Board{
 		Locs:  make(map[Loc]*Robot),
-		Size:  Loc{w, h},
+		Size:  size,
 		Cells: make([][]CellType, w),
 	}
 
@@ -111,13 +124,23 @@ func EmptyBoard(w, h int) *Board {
 		b.Cells[i] = make([]CellType, h)
 	}
 
-	for x := 0; x < w; x++ {
-		for y := 0; y < h; y++ {
-			b.Cells[x][y] = b.cellType(x, y)
+	return b
+}
+
+func (b *Board) InitBoard(s Spawner, t Typer) {
+	b.s = s
+	b.c = t
+
+	for x := 0; x < b.Size.X; x++ {
+		for y := 0; y < b.Size.Y; y++ {
+			t := b.c.Type(x, y)
+			b.Cells[x][y] = t
+			if t == Spawn && x < b.Size.X/2 {
+				b.leftSpawns = append(b.leftSpawns, Loc{x, y})
+			}
 		}
 	}
-
-	return b
+	b.spawnBots()
 }
 
 func (b *Board) Width() int {
@@ -133,38 +156,26 @@ func (b *Board) newID() RobotID {
 	return b.NextID
 }
 
-// NewBoard creates an initialized game board for two factions.
-func NewBoard(w, h int) *Board {
-	b := EmptyBoard(w, h)
-	b.SpawnBots(everyOther)
-	return b
-}
-
-func (b *Board) SpawnBots(spawnFunc SpawnFunc) {
+func (b *Board) spawnBots() {
 	// Clear out the spawn zone
-	for i := 0; i < b.Size.Y; i++ {
-		la, lb := Loc{0, i}, Loc{b.Size.X - 1, i}
-		delete(b.Locs, la)
-		delete(b.Locs, lb)
+	for _, locA := range b.leftSpawns {
+		locB := Loc{b.Size.X - 1 - locA.X, locA.Y}
+		delete(b.Locs, locA)
+		delete(b.Locs, locB)
 	}
 
-	// Just line the ends with robots
-	for i := 0; i < b.Size.Y; i++ {
-		la, lb := Loc{0, i}, Loc{b.Size.X - 1, i}
-		if b.isValidLoc(la) && spawnFunc(la) {
-			b.Locs[la] = &Robot{
-				ID:      b.newID(),
-				Health:  InitialHealth,
-				Faction: P1Faction,
-			}
+	// Spawn() returns the list of locations to spawn bots at
+	for _, locA := range b.s.Spawn(b.leftSpawns) {
+		locB := Loc{b.Size.X - 1 - locA.X, locA.Y}
+		b.Locs[locA] = &Robot{
+			ID:      b.newID(),
+			Health:  InitialHealth,
+			Faction: P1Faction,
 		}
-
-		if b.isValidLoc(lb) && spawnFunc(lb) {
-			b.Locs[lb] = &Robot{
-				ID:      b.newID(),
-				Health:  InitialHealth,
-				Faction: P2Faction,
-			}
+		b.Locs[locB] = &Robot{
+			ID:      b.newID(),
+			Health:  InitialHealth,
+			Faction: P2Faction,
 		}
 	}
 }
@@ -230,7 +241,7 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 	b.Round++
 
 	if b.Round%NewBotsSpacing == 0 {
-		b.SpawnBots(randomSpawnFuncGen(b))
+		b.spawnBots()
 	}
 }
 
@@ -248,7 +259,7 @@ func (b *Board) issueAttacks(moves []botMove) {
 		}
 
 		// If there's a bot at the attack location, make them sad
-		// You *can* hurt attack your own robots
+		// You *can* attack your own robots
 		victim := b.Locs[attackLoc]
 		if victim != nil {
 			for _, m := range moves {
@@ -440,10 +451,10 @@ func (b *Board) AtXY(x, y int) CellInfo {
 	if !b.isValidLoc(Loc{x, y}) {
 		return CellInfo{
 			Bot:      nil,
-			CellType: b.Cells[x][y],
+			CellType: Invalid,
 		}
-
 	}
+
 	return CellInfo{
 		Bot:      b.Locs[Loc{X: x, Y: y}],
 		CellType: b.Cells[x][y],
@@ -451,7 +462,10 @@ func (b *Board) AtXY(x, y int) CellInfo {
 }
 
 func (b *Board) isValidLoc(loc Loc) bool {
-	return b.Cells[loc.X][loc.Y] == Valid
+	if loc.X >= b.Size.X || loc.X < 0 || loc.Y < 0 || loc.Y >= b.Size.Y {
+		return false
+	}
+	return b.Cells[loc.X][loc.Y] == Valid || b.Cells[loc.X][loc.Y] == Spawn
 }
 
 // ToWire converts the board to the wire representation with respect to the
@@ -482,6 +496,30 @@ func (b *Board) ToWire(out botapi.Board, faction int) error {
 			outr.SetFaction(botapi.Faction_opponent)
 		}
 		n++
+	}
+	return nil
+}
+
+// ToWireWithInitial converts the board to the wire representation with respect
+// to the given faction (since the wire factions are us vs. them), including
+// information about which cells are which type.
+func (b *Board) ToWireWithInitial(out botapi.InitialBoard, faction int) error {
+	wireBoard, err := out.NewBoard()
+	b.ToWire(wireBoard, faction)
+
+	cells, err := botapi.NewCellType_List(out.Segment(), int32(b.Size.X*b.Size.Y))
+	if err != nil {
+		return err
+	}
+
+	if err = out.SetCells(cells); err != nil {
+		return err
+	}
+
+	for x, col := range b.Cells {
+		for y, cell := range col {
+			cells.Set(x+y*b.Size.X, cellToWire[cell])
+		}
 	}
 	return nil
 }

@@ -33,7 +33,7 @@ $(function() {
   });
 
   $('.create-user-form').registerAjaxForm(function(resp) {
-    var notice = $('<div class="alert"></div>');
+    var notice = $('<div class="alert alert-info"></div>');
     notice.text(resp);
     $(this).append(notice);
   });

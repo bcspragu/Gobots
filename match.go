@@ -81,7 +81,6 @@ func (e *aiEndpoint) listOnlineAIs() []onlineAI {
 // connect adds an online AI
 func (e *aiEndpoint) connect(name, token string, ai botapi.Ai) (aiID, error) {
 	infos, err := e.ds.listAIsForUser(accessToken(token))
-	log.Println("hh", infos, err)
 	if err != nil {
 		return "", err
 	}
@@ -144,10 +143,12 @@ func (aic *aiConnector) drop() {
 
 func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB *onlineAI) error {
 	// Create new board and store it.
-	b := engine.NewBoard(BoardSize, BoardSize)
+	b := engine.EmptyBoard(BoardSize, BoardSize)
+	// TODO: Have the user choose this
+	b.InitBoard(&engine.RandomSpawn{3}, engine.NewLineSpawn(engine.Loc{BoardSize, BoardSize}))
 	_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
-	wb, _ := botapi.NewRootBoard(seg)
-	b.ToWire(wb, engine.P1Faction)
+	wb, _ := botapi.NewRootInitialBoard(seg)
+	b.ToWireWithInitial(wb, engine.P1Faction)
 	gid, err := ds.startGame(aiA.Info.ID, aiB.Info.ID, wb)
 	if err != nil {
 		return err
@@ -161,14 +162,17 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 		go aiA.takeTurn(turnCtx, gid, b, engine.P1Faction, chA)
 		go aiB.takeTurn(turnCtx, gid, b, engine.P2Faction, chB)
 		ra, rb := <-chA, <-chB
-		if ra.err.HasError() || rb.err.HasError() {
-			// TODO: Something better with errors
-			log.Println("ra", ra.err)
-			log.Println("rb", rb.err)
+		if ra.err.HasError() {
+			log.Printf("Errors from AI ID %s: %v", aiA.Info.ID, ra.err)
 		}
+		if rb.err.HasError() {
+			log.Printf("Errors from AI ID %s: %v", aiB.Info.ID, rb.err)
+		}
+		log.Printf("Got %d moves from A and %d moves from B", ra.results.Len(), rb.results.Len())
 		b.Update(ra.results, rb.results)
 		_, s, err := capnp.NewMessage(capnp.SingleSegment(nil))
 		if err != nil {
+			return errors.New("2" + err.Error())
 			return err
 		}
 		r, err := botapi.NewRootReplay_Round(s)
@@ -181,11 +185,37 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 			return err
 		}
 		b.ToWire(wireBoard, engine.P1Faction)
-		// TODO: Concatenate ra.results and rb.results and make that the move_list for this round
+
+		ral, rbl := ra.results.Len(), rb.results.Len()
+		turns, err := botapi.NewTurn_List(r.Segment(), int32(ral+rbl))
+		if err != nil {
+			return err
+		}
+		for i := 0; i < ral; i++ {
+			t := ra.results.At(i)
+			if err := turns.Set(i, t); err != nil {
+				return err
+			}
+		}
+		for i := 0; i < rbl; i++ {
+			t := rb.results.At(i)
+			if err := turns.Set(i+ral, t); err != nil {
+				return err
+			}
+		}
+		r.SetMoves(turns)
 		db.addRound(gid, r)
 	}
 
-	return nil
+	wt := Tie
+	p1B, p2B := b.BotCount(1), b.BotCount(2)
+	if p1B > p2B {
+		wt = P1Win
+	} else if p1B < p2B {
+		wt = P2Win
+	}
+
+	return db.finishGame(gid, &aiA.Info, &aiB.Info, wt)
 }
 
 type onlineAI struct {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -29,15 +28,4 @@ func (c *context) Write(s string) {
 
 func (c *context) gameID() gameID {
 	return gameID(strings.Split(c.r.URL.Path, "/")[2])
-}
-
-func (c *context) roundNumber() int {
-	parts := strings.Split(c.r.URL.Path, "/")
-	if len(parts) < 4 {
-		return -1
-	}
-	if r, err := strconv.Atoi(parts[3]); err == nil {
-		return r
-	}
-	return -1
 }

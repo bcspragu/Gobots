@@ -11,17 +11,15 @@ import (
 )
 
 func main() {
-	// TODO(bsprague): Add things to this handy global JS object when you get
-	// even remotely that far
 	js.Global.Set("Gobot", map[string]interface{}{
-		"GetBoard": GetBoard,
+		"GetPlayback": GetPlayback,
 	})
 }
 
-func GetBoard(base64Board string) *js.Object {
-	var board engine.Board
-	buf := bytes.NewReader([]byte(base64Board))
+func GetPlayback(base64Playback string) *js.Object {
+	var p engine.Playback
+	buf := bytes.NewReader([]byte(base64Playback))
 	r := base64.NewDecoder(base64.StdEncoding, buf)
-	gob.NewDecoder(r).Decode(&board)
-	return js.MakeWrapper(&board)
+	gob.NewDecoder(r).Decode(&p)
+	return js.MakeWrapper(&p)
 }

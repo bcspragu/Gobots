@@ -2,43 +2,16 @@
 package game
 
 import (
-	"fmt"
-	"net"
-	"os"
-	"os/signal"
-	"syscall"
+	"log"
 
 	"github.com/bcspragu/Gobots/botapi"
-	"golang.org/x/net/context"
-	"zombiezen.com/go/capnproto2/rpc"
 )
 
 // Board represents the state of the board in a round.
 type Board struct {
-	Round int
-	Cells [][]*Robot
-}
-
-// At returns the robot at a particular cell or nil if none is present.
-func (b *Board) At(loc Loc) *Robot {
-	return b.Cells[loc.Y][loc.X]
-}
-
-// IsInside reports whether loc is inside the board bounds.
-func (b *Board) IsInside(loc Loc) bool {
-	return loc.X >= 0 && loc.X < len(b.Cells[0]) && loc.Y >= 0 && loc.Y < len(b.Cells)
-}
-
-// Find finds a robot on the board that matches the given function.
-func (b *Board) Find(f func(*Robot) bool) *Robot {
-	for _, row := range b.Cells {
-		for _, r := range row {
-			if r != nil && f(r) {
-				return r
-			}
-		}
-	}
-	return nil
+	Round    int
+	Cells    [][]*Robot
+	loctypes [][]LocType
 }
 
 // A Robot is a piece on the board.
@@ -53,8 +26,17 @@ type Robot struct {
 type Faction int
 
 const (
-	MyFaction Faction = iota
+	MyFaction Faction = iota + 1
 	OpponentFaction
+)
+
+// LocType identifies what properties (invalid, valid, spawn) the location has
+type LocType int
+
+const (
+	InvalidLoc LocType = iota
+	ValidLoc
+	SpawnLoc
 )
 
 // An AI is an algorithm that makes moves for a particular game.
@@ -67,49 +49,21 @@ type Loc struct {
 	X, Y int
 }
 
-func (loc Loc) Add(d Direction) Loc {
-	switch d {
-	case North:
-		return Loc{X: loc.X, Y: loc.Y - 1}
-	case South:
-		return Loc{X: loc.X, Y: loc.Y + 1}
-	case West:
-		return Loc{X: loc.X - 1, Y: loc.Y}
-	case East:
-		return Loc{X: loc.X + 1, Y: loc.Y}
-	default:
-		return loc
-	}
-}
-
-// Distance returns the Manhattan distance between two locations.
-func Distance(a, b Loc) int {
-	dx := a.X - b.X
-	if dx < 0 {
-		dx = -dx
-	}
-	dy := a.Y - b.Y
-	if dy < 0 {
-		dy = -dy
-	}
-	return dx + dy
-}
-
 // A Action represents what a robot will do.  The zero value waits the turn.
 type Action struct {
 	Kind      ActionKind
 	Direction Direction
 }
 
-func (t Action) toWire(id uint32, wire botapi.Turn) {
+func (a Action) toWire(id uint32, wire botapi.Turn) {
 	wire.SetId(id)
-	switch t.Kind {
+	switch a.Kind {
 	case Wait:
 		wire.SetWait()
 	case Move:
-		wire.SetMove(t.Direction.toWire())
+		wire.SetMove(a.Direction.toWire())
 	case Attack:
-		wire.SetAttack(t.Direction.toWire())
+		wire.SetAttack(a.Direction.toWire())
 	case SelfDestruct:
 		wire.SetSelfDestruct()
 	}
@@ -118,12 +72,13 @@ func (t Action) toWire(id uint32, wire botapi.Turn) {
 // ActionKind is an enumeration of the kinds of turns.
 type ActionKind int
 
-// Kinds of turns.
+// Kinds of actions.
 const (
 	Wait ActionKind = iota
 	Move
 	Attack
 	SelfDestruct
+	Guard
 )
 
 // Direction is a cardinal direction.
@@ -139,56 +94,6 @@ const (
 
 func (d Direction) toWire() botapi.Direction {
 	return botapi.Direction(d)
-}
-
-// Client represents a connection to the game server.
-type Client struct {
-	conn      *rpc.Conn
-	connector botapi.AiConnector
-}
-
-// Dial connects to a server at the given TCP address.
-func Dial(addr string) (*Client, error) {
-	c, err := net.Dial("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-	conn := rpc.NewConn(rpc.StreamTransport(c))
-	return &Client{
-		conn:      conn,
-		connector: botapi.AiConnector{Client: conn.Bootstrap(context.TODO())},
-	}, nil
-}
-
-// Close terminates the connection to the server.
-func (c *Client) Close() error {
-	return c.conn.Close()
-}
-
-// RegisterAI adds an AI implementation for the token given by the website.
-// The AI factory function will be called for each new game encountered.
-func (c *Client) RegisterAI(name, token string, factory Factory) error {
-	a := botapi.Ai_ServerToClient(&aiAdapter{
-		factory: factory,
-		games:   make(map[string]AI),
-	})
-	_, err := c.connector.Connect(context.TODO(), func(r botapi.ConnectRequest) error {
-		creds, err := r.NewCredentials()
-		if err != nil {
-			return err
-		}
-		err = creds.SetBotName(name)
-		if err != nil {
-			return err
-		}
-		err = creds.SetSecretToken(token)
-		if err != nil {
-			return err
-		}
-		r.SetAi(a)
-		return nil
-	}).Struct()
-	return err
 }
 
 // Factory is a function that creates an AI per game.
@@ -230,6 +135,7 @@ func (a *aiAdapter) TakeTurn(call botapi.Ai_takeTurn) error {
 	}
 	for i, r := range robots {
 		t := ai.Act(b, r)
+		log.Printf("Robot %v making move %v", r, t)
 		t.toWire(r.ID, turns.At(i))
 	}
 	call.Results.SetTurns(turns)
@@ -265,6 +171,7 @@ func convertBoard(wire botapi.Board) (b *Board, playerBots []*Robot, err error) 
 		default:
 			rr.Faction = OpponentFaction
 		}
+		log.Printf("Robot #%d: %+v", i, rr)
 		rows[rr.Loc.Y][rr.Loc.X] = rr
 	}
 	return &Board{
@@ -277,32 +184,3 @@ const (
 	exitFail  = 1
 	exitUsage = 64
 )
-
-func StartServerForFactory(name, token string, factory Factory) {
-	c, err := Dial("localhost:8001")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "dial:", err)
-		os.Exit(exitFail)
-	}
-	if err = c.RegisterAI(name, token, factory); err != nil {
-		fmt.Fprintln(os.Stderr, "register:", err)
-		os.Exit(exitFail)
-	}
-	fmt.Fprintf(os.Stderr, "Connected bot %s. Ctrl-C or send SIGINT to disconnect.", name)
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGQUIT)
-	<-sig
-	signal.Stop(sig)
-	fmt.Fprintln(os.Stderr, "Interrupted. Quitting...")
-	if err := c.Close(); err != nil {
-		fmt.Fprintln(os.Stderr, "close:", err)
-		os.Exit(exitFail)
-	}
-}
-
-func StartServerForBot(name, token string, ai AI) {
-	factory := func(gameID string) AI {
-		return ai
-	}
-	StartServerForFactory(name, token, factory)
-}

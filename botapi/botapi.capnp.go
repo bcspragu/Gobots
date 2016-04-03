@@ -687,6 +687,104 @@ func (p Board_Promise) Struct() (Board, error) {
 	return Board{s}, err
 }
 
+type InitialBoard struct{ capnp.Struct }
+
+func NewInitialBoard(s *capnp.Segment) (InitialBoard, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	if err != nil {
+		return InitialBoard{}, err
+	}
+	return InitialBoard{st}, nil
+}
+
+func NewRootInitialBoard(s *capnp.Segment) (InitialBoard, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	if err != nil {
+		return InitialBoard{}, err
+	}
+	return InitialBoard{st}, nil
+}
+
+func ReadRootInitialBoard(msg *capnp.Message) (InitialBoard, error) {
+	root, err := msg.Root()
+	if err != nil {
+		return InitialBoard{}, err
+	}
+	st := capnp.ToStruct(root)
+	return InitialBoard{st}, nil
+}
+
+func (s InitialBoard) Board() (Board, error) {
+	p, err := s.Struct.Pointer(0)
+	if err != nil {
+		return Board{}, err
+	}
+
+	ss := capnp.ToStruct(p)
+
+	return Board{Struct: ss}, nil
+}
+
+func (s InitialBoard) SetBoard(v Board) error {
+
+	return s.Struct.SetPointer(0, v.Struct)
+}
+
+// NewBoard sets the board field to a newly
+// allocated Board struct, preferring placement in s's segment.
+func (s InitialBoard) NewBoard() (Board, error) {
+
+	ss, err := NewBoard(s.Struct.Segment())
+	if err != nil {
+		return Board{}, err
+	}
+	err = s.Struct.SetPointer(0, ss)
+	return ss, err
+}
+
+func (s InitialBoard) Cells() (CellType_List, error) {
+	p, err := s.Struct.Pointer(1)
+	if err != nil {
+		return CellType_List{}, err
+	}
+
+	l := capnp.ToList(p)
+
+	return CellType_List{List: l}, nil
+}
+
+func (s InitialBoard) SetCells(v CellType_List) error {
+
+	return s.Struct.SetPointer(1, v.List)
+}
+
+// InitialBoard_List is a list of InitialBoard.
+type InitialBoard_List struct{ capnp.List }
+
+// NewInitialBoard creates a new list of InitialBoard.
+func NewInitialBoard_List(s *capnp.Segment, sz int32) (InitialBoard_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
+	if err != nil {
+		return InitialBoard_List{}, err
+	}
+	return InitialBoard_List{l}, nil
+}
+
+func (s InitialBoard_List) At(i int) InitialBoard           { return InitialBoard{s.List.Struct(i)} }
+func (s InitialBoard_List) Set(i int, v InitialBoard) error { return s.List.SetStruct(i, v.Struct) }
+
+// InitialBoard_Promise is a wrapper for a InitialBoard promised by a client call.
+type InitialBoard_Promise struct{ *capnp.Pipeline }
+
+func (p InitialBoard_Promise) Struct() (InitialBoard, error) {
+	s, err := p.Pipeline.Struct()
+	return InitialBoard{s}, err
+}
+
+func (p InitialBoard_Promise) Board() Board_Promise {
+	return Board_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
+}
+
 type Robot struct{ capnp.Struct }
 
 func NewRobot(s *capnp.Segment) (Robot, error) {
@@ -838,29 +936,29 @@ func (s Replay) SetGameId(v string) error {
 	return s.Struct.SetPointer(0, t)
 }
 
-func (s Replay) InitialBoard() (Board, error) {
+func (s Replay) Initial() (InitialBoard, error) {
 	p, err := s.Struct.Pointer(1)
 	if err != nil {
-		return Board{}, err
+		return InitialBoard{}, err
 	}
 
 	ss := capnp.ToStruct(p)
 
-	return Board{Struct: ss}, nil
+	return InitialBoard{Struct: ss}, nil
 }
 
-func (s Replay) SetInitialBoard(v Board) error {
+func (s Replay) SetInitial(v InitialBoard) error {
 
 	return s.Struct.SetPointer(1, v.Struct)
 }
 
-// NewInitialBoard sets the initialBoard field to a newly
-// allocated Board struct, preferring placement in s's segment.
-func (s Replay) NewInitialBoard() (Board, error) {
+// NewInitial sets the initial field to a newly
+// allocated InitialBoard struct, preferring placement in s's segment.
+func (s Replay) NewInitial() (InitialBoard, error) {
 
-	ss, err := NewBoard(s.Struct.Segment())
+	ss, err := NewInitialBoard(s.Struct.Segment())
 	if err != nil {
-		return Board{}, err
+		return InitialBoard{}, err
 	}
 	err = s.Struct.SetPointer(1, ss)
 	return ss, err
@@ -905,8 +1003,8 @@ func (p Replay_Promise) Struct() (Replay, error) {
 	return Replay{s}, err
 }
 
-func (p Replay_Promise) InitialBoard() Board_Promise {
-	return Board_Promise{Pipeline: p.Pipeline.GetPipeline(1)}
+func (p Replay_Promise) Initial() InitialBoard_Promise {
+	return InitialBoard_Promise{Pipeline: p.Pipeline.GetPipeline(1)}
 }
 
 type Replay_Round struct{ capnp.Struct }
@@ -1243,6 +1341,66 @@ func (l Direction_List) At(i int) Direction {
 }
 
 func (l Direction_List) Set(i int, v Direction) {
+	ul := capnp.UInt16List{List: l.List}
+	ul.Set(i, uint16(v))
+}
+
+type CellType uint16
+
+// Values of CellType.
+const (
+	CellType_invalid CellType = 0
+	CellType_valid   CellType = 1
+	CellType_spawn   CellType = 2
+)
+
+// String returns the enum's constant name.
+func (c CellType) String() string {
+	switch c {
+	case CellType_invalid:
+		return "invalid"
+	case CellType_valid:
+		return "valid"
+	case CellType_spawn:
+		return "spawn"
+
+	default:
+		return ""
+	}
+}
+
+// CellTypeFromString returns the enum value with a name,
+// or the zero value if there's no such value.
+func CellTypeFromString(c string) CellType {
+	switch c {
+	case "invalid":
+		return CellType_invalid
+	case "valid":
+		return CellType_valid
+	case "spawn":
+		return CellType_spawn
+
+	default:
+		return 0
+	}
+}
+
+type CellType_List struct{ capnp.List }
+
+func NewCellType_List(s *capnp.Segment, sz int32) (CellType_List, error) {
+	l, err := capnp.NewUInt16List(s, sz)
+	if err != nil {
+		return CellType_List{}, err
+	}
+	return CellType_List{l.List}, nil
+}
+
+func (l CellType_List) At(i int) CellType {
+	ul := capnp.UInt16List{List: l.List}
+	return CellType(ul.At(i))
+}
+
+func (l CellType_List) Set(i int, v CellType) {
 	ul := capnp.UInt16List{List: l.List}
 	ul.Set(i, uint16(v))
 }

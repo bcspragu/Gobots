@@ -1,6 +1,7 @@
 angular.module('gobotApp', [])
 .controller('GameController', function($scope) {
   var game = this;
+  var playback = Gobot.GetPlayback(replayStr);
   game.round = 0;
 
   game.updateBoard = function(board) {
@@ -15,24 +16,17 @@ angular.module('gobotApp', [])
     $scope.$apply();
   }
 
-  $.get(buildUrl(game.round), function(resp) {
-    game.updateBoard(Gobot.GetBoard(resp));
-  });
+  //game.updateBoard(playback.Board(0));
   var id = window.setInterval(function() {
     game.round++;
-    $.get(buildUrl(game.round), function(resp) {
-      game.updateBoard(Gobot.GetBoard(resp));
-    });
+    var board = playback.Board(game.round);
+    game.updateBoard(board);
     if (game.round >= 99) {
       window.clearInterval(id)
     }
-  }, 250);
+  }, 200);
 })
 .config(function($interpolateProvider) {
   $interpolateProvider.startSymbol('[[');
   $interpolateProvider.endSymbol(']]');
 });
-
-function buildUrl(round) {
-  return "http://" + Host + "/game/" + GameID + "/" + round
-}

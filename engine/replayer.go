@@ -1,35 +1,56 @@
 package engine
 
 import (
+	"log"
+
 	"github.com/bcspragu/Gobots/botapi"
+	"github.com/gopherjs/gopherjs/js"
 )
 
 type Playback struct {
-	replay botapi.Replay
+	Boards []*Board
 }
 
-func NewPlayback(r botapi.Replay) *Playback {
-	return &Playback{r}
+func (p *Playback) Board(i int) *js.Object {
+	return js.MakeWrapper(p.Boards[i])
 }
 
-func (p *Playback) Board(round int) (*Board, error) {
-	// TODO: Stop ignoring errors
-	if round == 0 {
-		w, err := p.replay.InitialBoard()
-		if err != nil {
-			return nil, err
-		}
-		b, err := boardFromWire(w)
-		if err != nil {
-			return nil, err
-		}
-		return b, nil
+func (p *Playback) BoardsJS() []*Board {
+	return p.Boards
+}
+
+func NewPlayback(r botapi.Replay) (*Playback, error) {
+	if bs, err := boards(r); err == nil {
+		return &Playback{
+			Boards: bs,
+		}, nil
 	} else {
-		rs, err := p.replay.Rounds()
-		if err != nil {
-			return nil, err
-		}
-		w, err := rs.At(round - 1).EndBoard()
+		return nil, err
+	}
+}
+
+func boards(replay botapi.Replay) ([]*Board, error) {
+	var cells [][]CellType
+	w, err := replay.Initial()
+	if err != nil {
+		return nil, err
+	}
+	ib, err := boardFromWireWithInitial(w)
+	if err != nil {
+		return nil, err
+	}
+	cells = ib.Cells
+
+	// After 0
+	rs, err := replay.Rounds()
+	if err != nil {
+		return nil, err
+	}
+
+	bs := make([]*Board, rs.Len()+1)
+	bs[0] = ib
+	for i := 0; i < rs.Len(); i++ {
+		w, err := rs.At(i).EndBoard()
 		if err != nil {
 			return nil, err
 		}
@@ -37,8 +58,10 @@ func (p *Playback) Board(round int) (*Board, error) {
 		if err != nil {
 			return nil, err
 		}
-		return b, nil
+		b.Cells = cells
+		bs[i+1] = b
 	}
+	return bs, nil
 }
 
 // boardFromWire converts the wire representation to the board
@@ -58,6 +81,46 @@ func boardFromWire(wire botapi.Board) (*Board, error) {
 			Y: int(bot.Y()),
 		}
 		b.Locs[loc] = robotFromWire(bot)
+	}
+
+	return b, nil
+}
+
+// boardFromWireWithInitial converts the wire representation to the board
+func boardFromWireWithInitial(wire botapi.InitialBoard) (*Board, error) {
+	wb, err := wire.Board()
+	if err != nil {
+		return new(Board), err
+	}
+
+	w, h := int(wb.Width()), int(wb.Height())
+	b := EmptyBoard(w, h)
+	b.Round = int(wb.Round())
+
+	bots, err := wb.Robots()
+	if err != nil {
+		return b, err
+	}
+	log.Printf("BoardFromWireWithInitial: Loaded %d bots", bots.Len())
+
+	for i := 0; i < bots.Len(); i++ {
+		bot := bots.At(i)
+		loc := Loc{
+			X: int(bot.X()),
+			Y: int(bot.Y()),
+		}
+		b.Locs[loc] = robotFromWire(bot)
+	}
+
+	cells, err := wire.Cells()
+	if err != nil {
+		return b, err
+	}
+
+	for i := 0; i < cells.Len(); i++ {
+		cell := cells.At(i)
+		x, y := i%w, i/w
+		b.Cells[x][y] = cellFromWire[cell]
 	}
 
 	return b, nil

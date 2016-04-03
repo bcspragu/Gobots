@@ -1,12 +1,17 @@
 package main
 
-import "github.com/bcspragu/Gobots/game"
+import (
+	"log"
+
+	"github.com/bcspragu/Gobots/game"
+)
 
 type pathfinder struct {
 	targets map[uint32]uint32
 }
 
 func (pf *pathfinder) Act(b *game.Board, r *game.Robot) game.Action {
+	log.Printf("Pathfinder making moves")
 	// Immediate surrounding attacks
 	ds := []game.Direction{
 		game.North,
@@ -16,7 +21,7 @@ func (pf *pathfinder) Act(b *game.Board, r *game.Robot) game.Action {
 	}
 	for _, d := range ds {
 		loc := r.Loc.Add(d)
-		if pf.opponentAt(b, loc) {
+		if opponentAt(b, loc) {
 			return game.Action{
 				Kind:      game.Attack,
 				Direction: d,
@@ -90,15 +95,4 @@ func nearestOpponent(b *game.Board, loc game.Loc) *game.Robot {
 		}
 	}
 	return closest
-}
-
-func (pf *pathfinder) opponentAt(b *game.Board, loc game.Loc) bool {
-	if !b.IsInside(loc) {
-		return false
-	}
-	r := b.At(loc)
-	if r == nil {
-		return false
-	}
-	return r.Faction == game.OpponentFaction
 }

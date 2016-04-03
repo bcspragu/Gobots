@@ -42,7 +42,8 @@ func main() {
 	http.HandleFunc("/createUser", baseWrapper(createUserHandler))
 	http.HandleFunc("/login", baseWrapper(loginHandler))
 	http.HandleFunc("/logout", baseWrapper(logoutHandler))
-	http.HandleFunc("/game/", baseWrapper(serveGame))
+	http.HandleFunc("/bots", baseWrapper(botHandler))
+	http.HandleFunc("/game/", noUserWrapper(serveGame))
 	http.HandleFunc("/startMatch", baseWrapper(requireLogin(startMatch)))
 
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
@@ -75,30 +76,50 @@ func serveIndex(c context) error {
 
 func serveGame(c context) error {
 	replay, err := db.lookupGame(c.gameID())
-	if c.roundNumber() == -1 {
-		data := tmplData{
-			Data: map[string]interface{}{
-				"GameID": c.gameID(),
-				"Exists": err != errGameNotFound,
-			},
+	if err != nil {
+		if err == errGameNotFound {
+			data := tmplData{
+				Data: map[string]interface{}{
+					"GameID": c.gameID(),
+					"Exists": false,
+				},
+			}
+			return templates.ExecuteTemplate(c, "game.html", data)
 		}
-		return templates.ExecuteTemplate(c, "game.html", data)
+		return err
 	}
 
-	// If we're here, they're looking for a single boards encoding
-	board, err := engine.NewPlayback(replay).Board(c.roundNumber())
+	p, err := engine.NewPlayback(replay)
 	if err != nil {
 		return err
 	}
+
 	var buf bytes.Buffer
-	err = gob.NewEncoder(&buf).Encode(board)
+	err = gob.NewEncoder(&buf).Encode(p)
 	if err != nil {
 		return err
 	}
-	enc := base64.NewEncoder(base64.StdEncoding, c.w)
+
+	var dat bytes.Buffer
+	enc := base64.NewEncoder(base64.StdEncoding, &dat)
 	enc.Write(buf.Bytes())
 	enc.Close()
-	return nil
+
+	gInfo, err := db.lookupGameInfo(c.gameID())
+	if err != nil {
+		return err
+	}
+
+	data := tmplData{
+		Data: map[string]interface{}{
+			"GameID":   c.gameID(),
+			"Exists":   true,
+			"Playback": dat.String(),
+			"P1Name":   gInfo.AI1.Name,
+			"P2Name":   gInfo.AI2.Name,
+		},
+	}
+	return templates.ExecuteTemplate(c, "game.html", data)
 }
 
 func serveError(w http.ResponseWriter, err error) {
@@ -109,13 +130,17 @@ func serveError(w http.ResponseWriter, err error) {
 func startMatch(c context) error {
 	ai1, _ := db.lookupAI(aiID(c.r.FormValue("ai1")))
 	ai2, _ := db.lookupAI(aiID(c.r.FormValue("ai2")))
+
 	online := globalAIEndpoint.listOnlineAIs()
 	var o1, o2 *onlineAI
 	for _, v := range online {
+		// Because we can't rely on the address of v
+		vv := v
 		if v.Info.ID == ai1.ID {
-			o1 = &v
-		} else if v.Info.ID == ai2.ID {
-			o2 = &v
+			o1 = &vv
+		}
+		if v.Info.ID == ai2.ID {
+			o2 = &vv
 		}
 	}
 
@@ -213,7 +238,7 @@ func createUserHandler(c context) error {
 	}
 
 	token := genName(25)
-	_, err := db.createUser(userInfo{
+	_, err := db.createUser(&userInfo{
 		Name:  name,
 		Token: accessToken(token),
 	})
@@ -237,4 +262,25 @@ func createUserHandler(c context) error {
 
 	c.Write("Your access token is: " + token + ". You'll use this to login and to get your bot on the server.")
 	return nil
+}
+
+func botHandler(c context) error {
+	dir, err := db.loadDirectory()
+	if err != nil {
+		return err
+	}
+
+	isOn := make(map[aiID]bool)
+
+	for _, on := range globalAIEndpoint.listOnlineAIs() {
+		isOn[on.Info.ID] = true
+	}
+
+	data := tmplData{
+		Data: map[string]interface{}{
+			"Directory": dir,
+			"Online":    isOn,
+		},
+	}
+	return templates.ExecuteTemplate(c, "bots.html", data)
 }

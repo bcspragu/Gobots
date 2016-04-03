@@ -56,6 +56,15 @@ func baseWrapper(handler func(c context) error) func(http.ResponseWriter, *http.
 	}
 }
 
+func noUserWrapper(handler func(c context) error) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c := newContext(w, r)
+		if err := handler(c); err != nil {
+			serveError(c.w, err)
+		}
+	}
+}
+
 var letters = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func genName(n int) string {

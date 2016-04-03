@@ -1,5 +1,8 @@
+.body {
+  margin-top: 55px;
+}
+
 .header {
-  padding-top: 55px;
   text-align: center;
 }
 
@@ -25,9 +28,24 @@ li > .nav-username {
   position: relative;
 }
 
-.go-img {
-  max-width: 100%;
-  max-height: 100%;
+.score {
+  font-size: 24px;
+  display: inline-block;
+}
+
+.gobot {
+  border-radius: 8px;
+  color: white;
+  flex: 1;
+  text-align: center;
+}
+
+.gobot.red {
+  background-color: darkred;
+}
+
+.gobot.blue {
+  background-color: darkblue;
 }
 
 .gameBoardContainer {
@@ -66,10 +84,15 @@ li > .nav-username {
     border: 1px solid black;
     background: white;
     flex: 1;
+    display: flex;
 }
 
 .cell.invalid {
   background: grey;
+}
+
+.cell.spawn {
+  background: lightgreen;
 }
 
 * {
