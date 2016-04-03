@@ -146,14 +146,17 @@ func startMatch(c context) error {
 	}
 
 	gidCh := make(chan gameID)
+	matchDone := make(chan struct{})
 	go func() {
 		err := runMatch(gidCh, gocontext.TODO(), db, o1, o2)
 		close(gidCh)
 		if err != nil {
 			log.Println("runMatch:", err)
 		}
+		matchDone <- struct{}{}
 	}()
 	gid := <-gidCh
+	<-matchDone
 	if gid == "" {
 		return errors.New("game couldn't start")
 	} else {
