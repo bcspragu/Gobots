@@ -66,7 +66,9 @@ func boards(replay botapi.Replay) ([]*Board, error) {
 
 // boardFromWire converts the wire representation to the board
 func boardFromWire(wire botapi.Board) (*Board, error) {
-	b := EmptyBoard(int(wire.Width()), int(wire.Height()))
+	b := EmptyBoard(BoardConfig{
+		Size: Loc{X: int(wire.Width()), Y: int(wire.Height())},
+	})
 	b.Round = int(wire.Round())
 
 	bots, err := wire.Robots()
@@ -94,7 +96,9 @@ func boardFromWireWithInitial(wire botapi.InitialBoard) (*Board, error) {
 	}
 
 	w, h := int(wb.Width()), int(wb.Height())
-	b := EmptyBoard(w, h)
+	b := EmptyBoard(BoardConfig{
+		Size: Loc{X: w, Y: h},
+	})
 	b.Round = int(wb.Round())
 
 	bots, err := wb.Robots()

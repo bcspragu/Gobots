@@ -18,7 +18,7 @@ type circleSpawn struct{ *baseCircle }
 // lineSpawn has a vertical line of spawns on either side
 type lineSpawn struct{ *baseCircle }
 
-func newCircleSpawn(size Loc) *circleSpawn {
+func NewCircleSpawn(size Loc) Typer {
 	cs := &circleSpawn{newBaseCircle(size)}
 
 	for x := 0; x < size.X; x++ {

@@ -23,13 +23,6 @@ const (
 )
 
 type (
-	Spawner interface {
-		// Given a list of possible spawn locations for the first player, return a
-		// list of locations to spawn players. The program will automatically
-		// mirror the spawn locations for the other faction.
-		Spawn(locs []Loc) []Loc
-	}
-
 	// CellInfo holds info about a which robot is in a cell and what type of cell
 	// it is
 	CellInfo struct {
@@ -98,6 +91,18 @@ type Board struct {
 	leftSpawns []Loc
 }
 
+type BoardConfig struct {
+	Size      Loc
+	Spawner   Spawner
+	CellTyper Typer
+}
+
+var DefaultConfig = BoardConfig{
+	Size:      Loc{X: 17, Y: 17},
+	Spawner:   NewRandomSpawn(2),
+	CellTyper: NewLineSpawn(Loc{X: 17, Y: 17}),
+}
+
 func (b *Board) BotCount(faction int) (n int) {
 	for _, bot := range b.Locs {
 		if bot.Faction == faction {
@@ -112,24 +117,23 @@ func (b *Board) CellsJS() [][]CellType {
 }
 
 // EmptyBoard creates an empty board of the given size.
-func EmptyBoard(w, h int) *Board {
-	size := Loc{w, h}
+func EmptyBoard(bc BoardConfig) *Board {
 	b := &Board{
 		Locs:  make(map[Loc]*Robot),
-		Size:  size,
-		Cells: make([][]CellType, w),
+		Size:  bc.Size,
+		Cells: make([][]CellType, bc.Size.X),
 	}
 
-	for i := 0; i < w; i++ {
-		b.Cells[i] = make([]CellType, h)
+	for i := 0; i < bc.Size.X; i++ {
+		b.Cells[i] = make([]CellType, bc.Size.Y)
 	}
 
 	return b
 }
 
-func (b *Board) InitBoard(s Spawner, t Typer) {
-	b.s = s
-	b.c = t
+func (b *Board) InitBoard(bc BoardConfig) {
+	b.s = bc.Spawner
+	b.c = bc.CellTyper
 
 	for x := 0; x < b.Size.X; x++ {
 		for y := 0; y < b.Size.Y; y++ {

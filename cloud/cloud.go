@@ -21,7 +21,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -193,36 +192,6 @@ func (c *Config) MaybeDeploy() {
 	cl.uploadBinary()
 	cl.createInstance()
 	os.Exit(0)
-}
-
-func (c *Config) restartLoop() {
-	if c.RestartPolicy == RestartNever {
-		return
-	}
-	url := "https://storage.googleapis.com/" + c.BinaryBucket + "/" + c.binaryObject()
-	var lastEtag string
-	for {
-		res, err := http.Head(url + "?" + fmt.Sprint(time.Now().Unix()))
-		if err != nil {
-			log.Printf("Warning: %v", err)
-			time.Sleep(15 * time.Second)
-			continue
-		}
-		etag := res.Header.Get("Etag")
-		if etag == "" {
-			log.Printf("Warning, no ETag in response: %v", res)
-			time.Sleep(15 * time.Second)
-			continue
-		}
-		if lastEtag != "" && etag != lastEtag {
-			log.Printf("Binary updated; restarting.")
-			// TODO: more graceful restart, letting systemd own the network connections.
-			// Then we can finish up requests here.
-			os.Exit(0)
-		}
-		lastEtag = etag
-		time.Sleep(15 * time.Second)
-	}
 }
 
 // uploadBinary uploads the currently-running Linux binary.

@@ -148,7 +148,8 @@ func startMatch(c context) error {
 	gidCh := make(chan gameID)
 	matchDone := make(chan struct{})
 	go func() {
-		err := runMatch(gidCh, gocontext.TODO(), db, o1, o2)
+		// TODO: Have the user choose the config
+		err := runMatch(gidCh, gocontext.TODO(), db, o1, o2, engine.DefaultConfig)
 		close(gidCh)
 		if err != nil {
 			log.Println("runMatch:", err)

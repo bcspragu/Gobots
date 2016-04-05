@@ -141,12 +141,11 @@ func (aic *aiConnector) drop() {
 	aic.e.removeAIs(aic.ais)
 }
 
-func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB *onlineAI) error {
+func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB *onlineAI, bc engine.BoardConfig) error {
 	sTime := time.Now()
 	// Create new board and store it.
-	b := engine.EmptyBoard(BoardSize, BoardSize)
-	// TODO: Have the user choose this
-	b.InitBoard(&engine.RandomSpawn{3}, engine.NewLineSpawn(engine.Loc{BoardSize, BoardSize}))
+	b := engine.EmptyBoard(bc)
+	b.InitBoard(bc)
 	_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
 	wb, _ := botapi.NewRootInitialBoard(seg)
 	b.ToWireWithInitial(wb, engine.P1Faction)
@@ -169,11 +168,9 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 		if rb.err.HasError() {
 			log.Printf("Errors from AI ID %s: %v", aiB.Info.ID, rb.err)
 		}
-		log.Printf("Got %d moves from A and %d moves from B", ra.results.Len(), rb.results.Len())
 		b.Update(ra.results, rb.results)
 		_, s, err := capnp.NewMessage(capnp.SingleSegment(nil))
 		if err != nil {
-			return errors.New("2" + err.Error())
 			return err
 		}
 		r, err := botapi.NewRootReplay_Round(s)

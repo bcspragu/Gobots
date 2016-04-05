@@ -135,6 +135,12 @@ func (loc Loc) Add(d Direction) Loc {
 	}
 }
 
+func ToFactory(ai AI) Factory {
+	return func(gameID string) AI {
+		return ai
+	}
+}
+
 func abs(x int) int {
 	if x >= 0 {
 		return x

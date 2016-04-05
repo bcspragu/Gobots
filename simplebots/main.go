@@ -28,4 +28,6 @@ func main() {
 		g = sunguard{}
 	}
 	game.StartServerForBot(*botName, code, g)
+
+	//game.FightBots(game.ToFactory(g), game.ToFactory(&pathfinder{}))
 }
