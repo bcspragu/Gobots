@@ -18,7 +18,7 @@ import (
 
 var (
 	flags         = flag.NewFlagSet("game flags", flag.ContinueOnError)
-	serverAddress = flags.String("server_address", "localhost:8001", "address of API server")
+	serverAddress = flags.String("server_address", "gobotgame.com:8001", "address of API server")
 	retryInterval = flags.Duration("retry_interval", 10*time.Second, "how often (in seconds) to retry connecting to the server after losing a connection")
 )
 
