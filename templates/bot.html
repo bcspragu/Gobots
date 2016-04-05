@@ -6,18 +6,30 @@
 <table class="table">
   <thead>
   <tr>
+    <th>Game ID</th>
     <th>Bot 1</th>
     <th>Bot 2</th>
     <th>Final Score</th>
+    <th>Winner</th>
     <th>Date</th>
   </tr>
   </thead>
   <tbody>
   {{ range $info := $hist }}
     <tr>
+      <td><a href="/game/{{$info.ID}}">{{$info.ID}}</a></td>
       <td>{{(index $ais $info.AI1.ID).Name}}</td>
       <td>{{(index $ais $info.AI2.ID).Name}}</td>
       <td>{{$info.AI1Score}} - {{$info.AI2Score}}</td>
+
+      {{ if gt $info.AI1Score $info.AI2Score }}
+        <td>{{(index $ais $info.AI1.ID).Name}}</td>
+      {{  else if gt $info.AI2Score $info.AI1Score }}
+        <td>{{(index $ais $info.AI2.ID).Name}}</td>
+      {{ else }}
+        <td>Tie</td>
+      {{ end }}
+
       <td>{{ $info.StartTime }}</td>
     </tr>
   {{ end }}

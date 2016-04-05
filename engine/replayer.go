@@ -15,6 +15,10 @@ func (p *Playback) Board(i int) *js.Object {
 	return js.MakeWrapper(p.Boards[i])
 }
 
+func (p *Playback) NumBoards() int {
+	return len(p.Boards)
+}
+
 func (p *Playback) BoardsJS() []*Board {
 	return p.Boards
 }

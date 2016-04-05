@@ -131,6 +131,7 @@ type aiInfo struct {
 }
 
 type gameInfo struct {
+	ID        gameID
 	AI1       *aiInfo
 	AI2       *aiInfo
 	AI1Score  int
@@ -343,6 +344,7 @@ func (db *dbImpl) matchHistory(id aiID) ([]*gameInfo, error) {
 				return err
 			}
 			if g.AI1.ID == id || g.AI2.ID == id {
+				g.ID = gameID(k)
 				gInfos = append(gInfos, &g)
 			}
 			return nil
@@ -478,6 +480,7 @@ func (db *dbImpl) lookupGameInfo(id gameID) (*gameInfo, error) {
 	var info *gameInfo
 	err := db.View(func(tx *bolt.Tx) error {
 		g, err := game(tx, id)
+		g.ID = id
 		info = g
 		return err
 	})

@@ -21,7 +21,7 @@ angular.module('gobotApp', [])
     game.round++;
     var board = playback.Board(game.round);
     game.updateBoard(board);
-    if (game.round >= 99) {
+    if (game.round >= playback.NumBoards()) {
       window.clearInterval(id)
     }
   }, 200);

@@ -11,21 +11,13 @@ type random struct{}
 
 func (random) Act(b *game.Board, r *game.Robot) game.Action {
 	ds := []game.Direction{
-		//game.North,
-		//game.South,
-		//game.East,
+		game.North,
+		game.South,
+		game.East,
 		game.West,
 	}
 
 	as := []game.ActionKind{
-		game.Move,
-		game.Move,
-		game.Move,
-		game.Move,
-		game.Move,
-		game.Move,
-		game.Move,
-		game.Move,
 		game.Move,
 		game.Move,
 		game.Move,

@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -15,7 +14,7 @@ var botName = flags.String("bot_name", "aggro", "which bot to use")
 func main() {
 	flags.SetOutput(ioutil.Discard)
 	flags.Parse(os.Args[1:])
-	//code := "HAXWUumlfiJekSXfwAHQlttHH"
+	code := "HAXWUumlfiJekSXfwAHQlttHH"
 	var g game.AI
 
 	switch *botName {
@@ -28,10 +27,10 @@ func main() {
 	case "sunguard":
 		g = sunguard{}
 	}
-	//game.StartServerForBot(*botName, code, g)
+	game.StartServerForFactory(*botName, code, game.ToFactory(g))
 
-	res := game.FightBotsN(game.ToFactory(g), game.ToFactory(&pathfinder{}), 1)
-	for _, m := range res {
-		fmt.Println(m.String())
-	}
+	//res := game.FightBotsN(game.ToFactory(g), game.ToFactory(&pathfinder{}), 1)
+	//for _, m := range res {
+	//fmt.Println(m.String())
+	//}
 }

@@ -244,7 +244,7 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 
 	b.Round++
 
-	if b.Round%NewBotsSpacing == 0 {
+	if b.Round%NewBotsSpacing == 0 && b.Round < 100 {
 		b.spawnBots()
 	}
 }

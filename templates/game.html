@@ -1,6 +1,6 @@
 {{ if .Data.Exists }}
   <div ng-app="gobotApp" ng-cloak ng-controller="GameController as game">
-    <h1 class="header">Round [[game.round + 1]]</h1>
+    <h1 class="header">Round [[game.round]]</h1>
     <div class="row">
       <div class="text-left col-xs-3 col-xs-offset-3 red score">{{.Data.P1Name}}: [[game.board.BotCount(1)]]</div>
       <div class="text-right col-xs-3 blue score">{{.Data.P2Name}}: [[game.board.BotCount(2)]]</div>

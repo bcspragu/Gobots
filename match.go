@@ -206,6 +206,7 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 	}
 
 	gInfo := &gameInfo{
+		ID:        gid,
 		AI1:       &aiA.Info,
 		AI2:       &aiB.Info,
 		AI1Score:  b.BotCount(1),
