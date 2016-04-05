@@ -3,12 +3,12 @@ package game
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/bcspragu/Gobots/botapi"
 	"github.com/bcspragu/Gobots/engine"
 	"golang.org/x/net/context"
-	"zombiezen.com/go/capnproto2"
 	"zombiezen.com/go/capnproto2/rpc"
 )
 
@@ -74,14 +74,11 @@ func fightN(f1, f2 Factory, n int) []MatchResult {
 	for i := 0; i < n; i++ {
 		b := engine.EmptyBoard(engine.DefaultConfig)
 		b.InitBoard(engine.DefaultConfig)
-		_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
-		wb, _ := botapi.NewRootInitialBoard(seg)
-		b.ToWireWithInitial(wb, engine.P1Faction)
 
 		for !b.IsFinished() {
 			turnCtx, _ := context.WithTimeout(ctx, 30*time.Second)
-			resA, _ := clientA.takeTurn(turnCtx, "0", b, engine.P1Faction)
-			resB, _ := clientB.takeTurn(turnCtx, "0", b, engine.P2Faction)
+			resA, _ := clientA.takeTurn(turnCtx, strconv.Itoa(i), b, engine.P1Faction)
+			resB, _ := clientB.takeTurn(turnCtx, strconv.Itoa(i), b, engine.P2Faction)
 			b.Update(resA, resB)
 		}
 		matchRes[i] = MatchResult{

@@ -144,12 +144,3 @@ loop:
 		}
 	}
 }
-
-// StartServerForBot connects to the server with the given robot name and user
-// token, and registers the robot provided
-func StartServerForBot(name, token string, ai AI) {
-	factory := func(gameID string) AI {
-		return ai
-	}
-	StartServerForFactory(name, token, factory)
-}

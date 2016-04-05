@@ -30,7 +30,7 @@ func main() {
 	}
 	//game.StartServerForBot(*botName, code, g)
 
-	res := game.FightBotsN(game.ToFactory(g), game.ToFactory(&pathfinder{}), 100)
+	res := game.FightBotsN(game.ToFactory(g), game.ToFactory(&pathfinder{}), 1)
 	for _, m := range res {
 		fmt.Println(m.String())
 	}
