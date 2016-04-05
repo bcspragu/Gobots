@@ -1,7 +1,7 @@
 package game
 
 import (
-	"log"
+	"fmt"
 	"net"
 	"time"
 
@@ -16,15 +16,31 @@ type localAI struct {
 	botapi.Ai
 }
 
-type MatchResults struct {
+type MatchResult struct {
+	P1Score int
+	P2Score int
 }
 
-// FightBots plays a match between the two bots and returns the result.
-func FightBotsN(f1, f2 Factory) {
-
+func (m *MatchResult) String() string {
+	outcome := "Tie"
+	if m.P1Score > m.P2Score {
+		outcome = "Player 1 wins"
+	} else if m.P1Score < m.P2Score {
+		outcome = "Player 2 wins"
+	}
+	return fmt.Sprintf("P1: %d P2: %d - %s", m.P1Score, m.P2Score, outcome)
 }
 
-func FightBots(f1, f2 Factory) {
+func FightBots(f1, f2 Factory, n int) MatchResult {
+	return fightN(f1, f2, 1)[0]
+}
+
+// FightBotsN plays a match between the two bots and returns the result.
+func FightBotsN(f1, f2 Factory, n int) []MatchResult {
+	return fightN(f1, f2, n)
+}
+
+func fightN(f1, f2 Factory, n int) []MatchResult {
 	aiA := &aiAdapter{factory: f1, games: make(map[string]gameState)}
 	aiB := &aiAdapter{factory: f2, games: make(map[string]gameState)}
 
@@ -53,20 +69,27 @@ func FightBots(f1, f2 Factory) {
 	clientA := localAI{botapi.Ai{Client: clientConnA.Bootstrap(ctx)}}
 	clientB := localAI{botapi.Ai{Client: clientConnB.Bootstrap(ctx)}}
 
+	matchRes := make([]MatchResult, n)
 	// Run the game
-	b := engine.EmptyBoard(engine.DefaultConfig)
-	b.InitBoard(engine.DefaultConfig)
-	_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
-	wb, _ := botapi.NewRootInitialBoard(seg)
-	b.ToWireWithInitial(wb, engine.P1Faction)
+	for i := 0; i < n; i++ {
+		b := engine.EmptyBoard(engine.DefaultConfig)
+		b.InitBoard(engine.DefaultConfig)
+		_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
+		wb, _ := botapi.NewRootInitialBoard(seg)
+		b.ToWireWithInitial(wb, engine.P1Faction)
 
-	for !b.IsFinished() {
-		turnCtx, _ := context.WithTimeout(ctx, 30*time.Second)
-		resA, _ := clientA.takeTurn(turnCtx, "0", b, engine.P1Faction)
-		resB, _ := clientB.takeTurn(turnCtx, "0", b, engine.P2Faction)
-		b.Update(resA, resB)
+		for !b.IsFinished() {
+			turnCtx, _ := context.WithTimeout(ctx, 30*time.Second)
+			resA, _ := clientA.takeTurn(turnCtx, "0", b, engine.P1Faction)
+			resB, _ := clientB.takeTurn(turnCtx, "0", b, engine.P2Faction)
+			b.Update(resA, resB)
+		}
+		matchRes[i] = MatchResult{
+			P1Score: b.BotCount(1),
+			P2Score: b.BotCount(2),
+		}
 	}
-	log.Printf("Final score: P1: %d P2: %d", b.BotCount(1), b.BotCount(2))
+	return matchRes
 }
 
 func (la *localAI) takeTurn(ctx context.Context, gid string, b *engine.Board, faction int) (botapi.Turn_List, error) {
