@@ -1,3 +1,5 @@
+package game
+
 /*
 Package game is used for developing robot AIs to compete on GobotGame.com. An
 example AI is included below:
