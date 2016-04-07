@@ -4,6 +4,8 @@ A programmatic robot-fighting game, **heavily** inspired by [Robot
 Game](http://robotgame.net). As of the time of this writing, it isn't online
 yet, but it will be at GobotGame.com (hopefully) soon.
 
+[Related Go Talk Slides](https://docs.google.com/a/google.com/presentation/d/1XCBCgk5l17PItL9w_1m9zs1UN2VStiNE_R-H8D4P8VY/edit?usp=sharing)
+
 ## Developing a Bot
 
 Several example robots are provided in the `simplebots` subdirectory, though
@@ -62,7 +64,21 @@ fighting two bots against each other and observing the outcome. To actually
 view the contents of a match, connect both of the bots to the server and fight
 them on there.
 
+## Connecting your bot
+
+1. Go to [Gobot Game](http://gobotgame.com) and enter a user name. It'll return
+   a unique token that you'll input into `game.StartServerForFactory` which
+   authenticates you and identifies you to the server.
+2. Your bot will show up in the list of Online Bots, you can start a match with
+   another online bot (or yourself), by selecting "Fight Bots".
+3. Watch the match play out, tweak bot, repeat!
+
 ## Deploying your Bot
 
-If you're building this as part of the workshop at UMass, you can use the [soon
-to be] provided script for deploying your bot to Google Cloud Platform.
+I have a bunch of Google Cloud credits for anyone who wants to serve there bot
+on Compute Engine. There's a guide for getting started with Go on Compute
+Engine
+[here](https://cloud.google.com/go/getting-started/run-on-compute-engine), and
+there's also the [cloudlaunch](https://godoc.org/go4.org/cloud/cloudlaunch)
+package for easily deploying binaries to Cloud Engine, if you're on a 64-bit
+Linux distro.
