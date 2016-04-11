@@ -54,7 +54,7 @@ connect to the GobotGame server, authenticate your bot, and play matches as
 they're requested through the website. It'll automatically attempt to reconnect
 to the server if the connection is lost, and will return error messages if the
 AccessToken is invalid or there's something wrong with the bot. To disconnect
-your bot from the server, type Ctrl-Z from the terminal.
+your bot from the server, type Ctrl-C from the terminal.
 
 ### Defining your bot
 
