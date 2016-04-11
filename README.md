@@ -1,8 +1,8 @@
 # Gobots
 
 A programmatic robot-fighting game, **heavily** inspired by [Robot
-Game](http://robotgame.net). As of the time of this writing, it isn't online
-yet, but it will be at GobotGame.com (hopefully) soon.
+Game](http://robotgame.net). It is online at
+[GobotGame.com](http://gobotgame.com).
 
 [Related Go Talk Slides](https://docs.google.com/a/google.com/presentation/d/1XCBCgk5l17PItL9w_1m9zs1UN2VStiNE_R-H8D4P8VY/edit?usp=sharing)
 
