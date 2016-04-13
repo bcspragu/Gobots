@@ -116,7 +116,7 @@ func (b *Board) IsInside(loc Loc) bool {
 
 // At returns the robot at a particular cell or nil if none is present.
 func (b *Board) At(loc Loc) *Robot {
-	return b.Cells[loc.Y][loc.X]
+	return b.Cells[loc.X][loc.Y]
 }
 
 // Add returns a the current location moved in the direction provided.
