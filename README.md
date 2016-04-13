@@ -1,8 +1,26 @@
 # Gobots
 
 A programmatic robot-fighting game, **heavily** inspired by [Robot
-Game](http://robotgame.net). As of the time of this writing, it isn't online
-yet, but it will be at GobotGame.com (hopefully) soon.
+Game](http://robotgame.net). It is online at
+[GobotGame.com](http://gobotgame.com).
+
+[Related Go Talk Slides](https://docs.google.com/a/google.com/presentation/d/1XCBCgk5l17PItL9w_1m9zs1UN2VStiNE_R-H8D4P8VY/edit?usp=sharing)
+
+## Installing Go
+
+Instructions for installing Go can be found
+[here](https://golang.org/doc/install). Once Go is installed on your system and
+your GOPATH is set properly, run `go get -u github.com/bcspragu/Gobots/...` to
+install the relevant packages for Gobots.
+
+## Creating an account on Gobot Game
+
+1. Go to [Gobot Game](http://gobotgame.com) and enter a user name. It'll return
+   a unique token that you'll input into `game.StartServerForFactory` which
+   authenticates you and identifies you to the server.
+2. Your bot will show up in the list of Online Bots, you can start a match with
+   another online bot (or yourself), by selecting "Fight Bots".
+3. Watch the match play out, tweak bot, repeat!
 
 ## Developing a Bot
 
@@ -31,7 +49,12 @@ func main() {
 }
 ```
 
-Explaining what this code does:
+The `game.StartServerForFactory` call will take in an instance of your bot,
+connect to the GobotGame server, authenticate your bot, and play matches as
+they're requested through the website. It'll automatically attempt to reconnect
+to the server if the connection is lost, and will return error messages if the
+AccessToken is invalid or there's something wrong with the bot. To disconnect
+your bot from the server, type Ctrl-C from the terminal.
 
 ### Defining your bot
 
@@ -64,5 +87,10 @@ them on there.
 
 ## Deploying your Bot
 
-If you're building this as part of the workshop at UMass, you can use the [soon
-to be] provided script for deploying your bot to Google Cloud Platform.
+I have a bunch of Google Cloud credits for anyone who wants to serve there bot
+on Compute Engine. There's a guide for getting started with Go on Compute
+Engine
+[here](https://cloud.google.com/go/getting-started/run-on-compute-engine), and
+there's also the [cloudlaunch](https://godoc.org/go4.org/cloud/cloudlaunch)
+package for easily deploying binaries to Cloud Engine, if you're on a 64-bit
+Linux distro.
