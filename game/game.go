@@ -95,6 +95,8 @@ func (a Action) toWire(id uint32, wire botapi.Turn) {
 		wire.SetAttack(a.Direction.toWire())
 	case SelfDestruct:
 		wire.SetSelfDestruct()
+	case Guard:
+		wire.SetGuard()
 	}
 }
 
