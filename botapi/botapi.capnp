@@ -90,6 +90,7 @@ enum Direction {
   south @1;
   east @2;
   west @3;
+  none @4;
 }
 
 enum CellType {

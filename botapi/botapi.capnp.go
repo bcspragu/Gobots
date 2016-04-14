@@ -1341,6 +1341,7 @@ const (
 	Direction_south Direction = 1
 	Direction_east  Direction = 2
 	Direction_west  Direction = 3
+	Direction_none  Direction = 4
 )
 
 // String returns the enum's constant name.
@@ -1354,6 +1355,8 @@ func (c Direction) String() string {
 		return "east"
 	case Direction_west:
 		return "west"
+	case Direction_none:
+		return "none"
 
 	default:
 		return ""
@@ -1372,6 +1375,8 @@ func DirectionFromString(c string) Direction {
 		return Direction_east
 	case "west":
 		return Direction_west
+	case "none":
+		return Direction_none
 
 	default:
 		return 0

@@ -117,11 +117,11 @@ type Direction int
 
 // The defined directions.
 const (
-	None  = Direction(-1)
 	North = Direction(botapi.Direction_north)
 	South = Direction(botapi.Direction_south)
 	East  = Direction(botapi.Direction_east)
 	West  = Direction(botapi.Direction_west)
+	None  = Direction(botapi.Direction_none)
 )
 
 func (d Direction) toWire() botapi.Direction {
