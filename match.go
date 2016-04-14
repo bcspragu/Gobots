@@ -182,7 +182,7 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 		if err != nil {
 			return err
 		}
-		b.ToWire(wireBoard, engine.P1Faction)
+		b.ToWire(wireBoard, engine.P2Faction)
 
 		ral, rbl := ra.results.Len(), rb.results.Len()
 		turns, err := botapi.NewTurn_List(r.Segment(), int32(ral+rbl))

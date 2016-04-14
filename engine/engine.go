@@ -422,18 +422,17 @@ func (b *Board) nextLoc(move botMove) Loc {
 }
 
 func directionOffsets(dir botapi.Direction) (x, y int) {
-	var xOff, yOff int
 	switch dir {
 	case botapi.Direction_north:
-		yOff = -1
+		y = -1
 	case botapi.Direction_south:
-		yOff = 1
+		y = 1
 	case botapi.Direction_east:
-		xOff = 1
+		x = 1
 	case botapi.Direction_west:
-		xOff = -1
+		x = -1
 	}
-	return xOff, yOff
+	return
 }
 
 func (b *Board) robotLoc(r *Robot) Loc {
