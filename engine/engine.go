@@ -196,7 +196,7 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 	}
 	for i, l := 0, ta.Len(); i < tb.Len(); i++ {
 		t := tb.At(i)
-		_, bot := b.fromID(RobotID(t.Id()))
+		loc, bot := b.fromID(RobotID(t.Id()))
 		moves[i+l].Bot = bot
 		moves[i+l].Turn = t
 		moves[i+l].Location = loc
