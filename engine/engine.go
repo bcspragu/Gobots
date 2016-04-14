@@ -199,6 +199,7 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 		_, bot := b.fromID(RobotID(t.Id()))
 		moves[i+l].Bot = bot
 		moves[i+l].Turn = t
+		moves[i+l].Location = loc
 	}
 	c := make(collisionMap)
 	b.addCollisions(c, moves)
