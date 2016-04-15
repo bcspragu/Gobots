@@ -94,3 +94,14 @@ Engine
 there's also the [cloudlaunch](https://godoc.org/go4.org/cloud/cloudlaunch)
 package for easily deploying binaries to Cloud Engine, if you're on a 64-bit
 Linux distro.
+
+## TODOs/Future Work on Gobot Game
+
+- Fix all the TODOs/error handling/good coding practice issues
+- Add a comprehensive test suite, aiming for >95% test coverage
+- Set bot timeouts to a lower, more reasonable value, and use WebSockets to live update the user on which round is currently being played
+- Add machinery/pipelining so that matches between online bots can happen without user intervention
+- Add a script/tool that uses cloudlaunch or a similar idea to upload bots to the cloud
+- Finalize the bot API, stop exposing raw board fields, which complicates local FightBot testing
+- Add a local GUI or web-mode so players can test their bots more easily
+- Convert a few simple bots from Robot Game so people have something to test against (also finish converting Sunguard)
