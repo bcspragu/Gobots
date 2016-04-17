@@ -7,13 +7,17 @@ import (
 	"zombiezen.com/go/capnproto2"
 )
 
+var testConfig = BoardConfig{
+	Size: Loc{X: 3, Y: 5},
+}
+
 func TestEmptyBoardIsEmpty(t *testing.T) {
-	b := EmptyBoard(3, 5)
-	if b.Size.X != 3 {
-		t.Errorf("b.Size.X = %d; want 3", b.Size.X)
+	b := EmptyBoard(testConfig)
+	if b.Width() != 3 {
+		t.Errorf("b.Width() = %d; want 3", b.Width())
 	}
-	if b.Size.Y != 5 {
-		t.Errorf("b.Size.Y = %d; want 5", b.Size.Y)
+	if b.Height() != 5 {
+		t.Errorf("b.Height() = %d; want 5", b.Height())
 	}
 	for y := 0; y < 5; y++ {
 		for x := 0; x < 3; x++ {
@@ -26,7 +30,7 @@ func TestEmptyBoardIsEmpty(t *testing.T) {
 }
 
 func TestBoard_Set(t *testing.T) {
-	b := EmptyBoard(3, 5)
+	b := EmptyBoard(testConfig)
 	loc := Loc{1, 2}
 	b.addBot(&Robot{
 		ID:      1234,
@@ -50,18 +54,21 @@ func TestBoard_Set(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	tests := []struct {
-		size      Loc
+		config    BoardConfig
 		init      map[Loc]Robot
 		initRound int
 
 		// TODO: parameters for round
 
-		want      map[Loc]Robot
-		wantRound int
+		want         map[Loc]Robot
+		wantRound    int
+		turnListFunc func(*capnp.Segment) (botapi.Turn_List, botapi.Turn_List)
 	}{
 		// TODO: This is no-op update change detector test.
 		{
-			size: Loc{5, 5},
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
+			},
 			init: map[Loc]Robot{
 				Loc{1, 1}: Robot{ID: 123, Health: 10, Faction: 0},
 				Loc{2, 2}: Robot{ID: 456, Health: 10, Faction: 1},
@@ -72,32 +79,38 @@ func TestUpdate(t *testing.T) {
 				Loc{2, 2}: Robot{ID: 456, Health: 10, Faction: 1},
 			},
 			wantRound: 1,
+			turnListFunc: func(s *capnp.Segment) (botapi.Turn_List, botapi.Turn_List) {
+				l, err := botapi.NewTurn_List(s, 0)
+				if err != nil {
+					t.Fatal("botapi.NewTurn_List:", err)
+				}
+				return l, l
+			},
 		},
 	}
 	for i, test := range tests {
-		t.Logf("tests[%d], size = %v, round = %d", i, test.size, test.initRound)
-		b := EmptyBoard(test.size.X, test.size.Y)
+		t.Logf("tests[%d], size = %v, round = %d", i, test.config, test.initRound)
+		b := EmptyBoard(test.config)
 		b.Round = test.initRound
 		for l, r := range test.init {
 			t.Logf("  -> set %v to %#v", l, r)
 			rr := new(Robot)
-			*rr = r
-			b.Set(l, rr)
+			b.addBot(rr, l)
 		}
 
-		t.Logf("  -> Update()")
-		// TODO: add parameters
-		// TODO Even harder: This line being commented out breaks the tests, need
-		// to insert blank Turn_Lists, but I don't even know how to properly call
-		// NewTurn_List. TF is a segment?!
-		//b.Update()
+		_, s, err := capnp.NewMessage(capnp.SingleSegment(nil))
+		if err != nil {
+			t.Fatal("capnp.NewMessage:", err)
+		}
+		ta, tb := test.turnListFunc(s)
+		b.Update(ta, tb)
 
 		if b.Round != test.wantRound {
 			t.Errorf("  !! b.Round = %d; want %d", b.Round, test.wantRound)
 		}
 
-		for y := 0; y < test.size.Y; y++ {
-			for x := 0; x < test.size.X; x++ {
+		for y := 0; y < test.config.Size.Y; y++ {
+			for x := 0; x < test.config.Size.X; x++ {
 				loc := Loc{x, y}
 				r := b.At(loc)
 				want, ok := test.want[loc]
@@ -121,9 +134,9 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestToWire(t *testing.T) {
-	b := EmptyBoard(4, 6)
-	b.Set(Loc{1, 2}, &Robot{ID: 254, Health: 50, Faction: 0})
-	b.Set(Loc{3, 4}, &Robot{ID: 973, Health: 12, Faction: 1})
+	b := EmptyBoard(BoardConfig{Size: Loc{X: 4, Y: 6}})
+	b.addBot(&Robot{ID: 254, Health: 50, Faction: 0}, Loc{1, 2})
+	b.addBot(&Robot{ID: 973, Health: 12, Faction: 1}, Loc{3, 4})
 	b.Round = 42
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))

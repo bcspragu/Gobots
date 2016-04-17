@@ -145,7 +145,7 @@ func runMatch(gidCh chan<- gameID, ctx gocontext.Context, ds datastore, aiA, aiB
 	sTime := time.Now()
 	// Create new board and store it.
 	b := engine.EmptyBoard(bc)
-	b.InitBoard(bc)
+	b.InitBoard()
 	_, seg, _ := capnp.NewMessage(capnp.SingleSegment(nil))
 	wb, _ := botapi.NewRootInitialBoard(seg)
 	b.ToWireWithInitial(wb, engine.P1Faction)

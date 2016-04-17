@@ -140,13 +140,12 @@ func (b *Board) Height() int {
 	return b.config.Size.Y
 }
 
-func (b *Board) InitBoard(bc BoardConfig) {
-	b.config = bc
-
+func (b *Board) InitBoard() {
 	for x := 0; x < b.Width(); x++ {
 		for y := 0; y < b.Height(); y++ {
 			t := b.config.CellTyper.Type(x, y)
 			b.Cells[x][y].Type = t
+			// TODO: New scheme to allow for bots spawning differently
 			if t == Spawn && x < b.Width()/2 {
 				b.p1Spawns = append(b.p1Spawns, Loc{x, y})
 			}
