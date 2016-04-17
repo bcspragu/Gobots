@@ -28,11 +28,11 @@ func TestEmptyBoardIsEmpty(t *testing.T) {
 func TestBoard_Set(t *testing.T) {
 	b := EmptyBoard(3, 5)
 	loc := Loc{1, 2}
-	b.Set(loc, &Robot{
+	b.addBot(&Robot{
 		ID:      1234,
 		Health:  50,
 		Faction: 3,
-	})
+	}, loc)
 	if r := b.At(loc); r != nil {
 		if r.ID != 1234 {
 			t.Errorf("b.At(%v).ID = %d; want 1234", loc, r.ID)

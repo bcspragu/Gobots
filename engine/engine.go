@@ -23,17 +23,18 @@ const (
 )
 
 type (
-	// CellInfo holds info about a which robot is in a cell and what type of cell
+	// Cell holds info about a which robot is in a cell and what type of cell
 	// it is
-	CellInfo struct {
-		Bot      *Robot
-		CellType CellType
+	Cell struct {
+		Bot  *Robot
+		Type CellType
 	}
 
 	CellType   int
 	DamageType int
 
-	collisionMap map[Loc][]botMove
+	collisionMap map[Loc][]*botMove
+	moveMap      map[RobotID]*botMove
 
 	botMove struct {
 		Bot      *Robot
@@ -77,34 +78,33 @@ var (
 )
 
 type Board struct {
-	Locs map[Loc]*Robot
+	Cells [][]Cell
+	Bots  map[RobotID]Loc
 
-	Cells [][]CellType
-	Size  Loc
-	Round int
-
+	Round  int
 	NextID RobotID
 
-	s Spawner
-	c Typer
-
-	leftSpawns []Loc
+	config   BoardConfig
+	p1Spawns []Loc
 }
 
 type BoardConfig struct {
 	Size      Loc
 	Spawner   Spawner
 	CellTyper Typer
+	NumRounds int
 }
 
 var DefaultConfig = BoardConfig{
 	Size:      Loc{X: 17, Y: 17},
 	Spawner:   NewRandomSpawn(2),
 	CellTyper: NewLineSpawn(Loc{X: 17, Y: 17}),
+	NumRounds: 100,
 }
 
 func (b *Board) BotCount(faction int) (n int) {
-	for _, bot := range b.Locs {
+	for _, loc := range b.Bots {
+		bot := b.Cells[loc.X][loc.Y].Bot
 		if bot.Faction == faction {
 			n++
 		}
@@ -112,47 +112,47 @@ func (b *Board) BotCount(faction int) (n int) {
 	return
 }
 
-func (b *Board) CellsJS() [][]CellType {
+func (b *Board) CellsJS() [][]Cell {
 	return b.Cells
 }
 
 // EmptyBoard creates an empty board of the given size.
 func EmptyBoard(bc BoardConfig) *Board {
 	b := &Board{
-		Locs:  make(map[Loc]*Robot),
-		Size:  bc.Size,
-		Cells: make([][]CellType, bc.Size.X),
+		Bots:   make(map[RobotID]Loc),
+		Cells:  make([][]Cell, bc.Size.X),
+		config: bc,
 	}
 
-	for i := 0; i < bc.Size.X; i++ {
-		b.Cells[i] = make([]CellType, bc.Size.Y)
+	// TODO: Use other, more efficient allocation method
+	for i := 0; i < b.Width(); i++ {
+		b.Cells[i] = make([]Cell, b.Height())
 	}
 
 	return b
 }
 
-func (b *Board) InitBoard(bc BoardConfig) {
-	b.s = bc.Spawner
-	b.c = bc.CellTyper
+func (b *Board) Width() int {
+	return b.config.Size.X
+}
 
-	for x := 0; x < b.Size.X; x++ {
-		for y := 0; y < b.Size.Y; y++ {
-			t := b.c.Type(x, y)
-			b.Cells[x][y] = t
-			if t == Spawn && x < b.Size.X/2 {
-				b.leftSpawns = append(b.leftSpawns, Loc{x, y})
+func (b *Board) Height() int {
+	return b.config.Size.Y
+}
+
+func (b *Board) InitBoard(bc BoardConfig) {
+	b.config = bc
+
+	for x := 0; x < b.Width(); x++ {
+		for y := 0; y < b.Height(); y++ {
+			t := b.config.CellTyper.Type(x, y)
+			b.Cells[x][y].Type = t
+			if t == Spawn && x < b.Width()/2 {
+				b.p1Spawns = append(b.p1Spawns, Loc{x, y})
 			}
 		}
 	}
 	b.spawnBots()
-}
-
-func (b *Board) Width() int {
-	return b.Size.X
-}
-
-func (b *Board) Height() int {
-	return b.Size.Y
 }
 
 func (b *Board) newID() RobotID {
@@ -160,47 +160,79 @@ func (b *Board) newID() RobotID {
 	return b.NextID
 }
 
+func (b *Board) addBot(bot *Robot, l Loc) {
+	if !b.inBounds(l) {
+		return
+	}
+
+	b.Bots[bot.ID] = l
+	b.Cells[l.X][l.Y].Bot = bot
+}
+
+func (b *Board) removeBot(l Loc) {
+	if !b.inBounds(l) {
+		return
+	}
+
+	if bot := b.Cells[l.X][l.Y].Bot; bot != nil {
+		delete(b.Bots, bot.ID)
+		b.Cells[l.X][l.Y].Bot = nil
+	}
+}
+
 func (b *Board) spawnBots() {
 	// Clear out the spawn zone
-	for _, locA := range b.leftSpawns {
-		locB := Loc{b.Size.X - 1 - locA.X, locA.Y}
-		delete(b.Locs, locA)
-		delete(b.Locs, locB)
+	for _, locA := range b.p1Spawns {
+		locB := Loc{b.Width() - 1 - locA.X, locA.Y}
+		b.removeBot(locA)
+		b.removeBot(locB)
 	}
 
 	// Spawn() returns the list of locations to spawn bots at
-	for _, locA := range b.s.Spawn(b.leftSpawns) {
-		locB := Loc{b.Size.X - 1 - locA.X, locA.Y}
-		b.Locs[locA] = &Robot{
+	for _, locA := range b.config.Spawner.Spawn(b.p1Spawns) {
+		locB := Loc{b.Width() - 1 - locA.X, locA.Y}
+
+		b.addBot(&Robot{
 			ID:      b.newID(),
 			Health:  InitialHealth,
 			Faction: P1Faction,
-		}
-		b.Locs[locB] = &Robot{
+		}, locA)
+
+		b.addBot(&Robot{
 			ID:      b.newID(),
 			Health:  InitialHealth,
 			Faction: P2Faction,
-		}
+		}, locB)
 	}
 }
 
 func (b *Board) Update(ta, tb botapi.Turn_List) {
-	// Put all the moves and bots into a list
-	moves := make([]botMove, ta.Len()+tb.Len())
+	// Put all the moves and bots into a map
+	moves := make(moveMap)
 	for i := 0; i < ta.Len(); i++ {
 		t := ta.At(i)
-		loc, bot := b.fromID(RobotID(t.Id()))
-		moves[i].Bot = bot
-		moves[i].Turn = t
-		moves[i].Location = loc
+		id := RobotID(t.Id())
+		loc, bot := b.fromID(id)
+
+		moves[id] = &botMove{
+			Bot:      bot,
+			Turn:     t,
+			Location: loc,
+		}
 	}
-	for i, l := 0, ta.Len(); i < tb.Len(); i++ {
+
+	for i := 0; i < tb.Len(); i++ {
 		t := tb.At(i)
-		loc, bot := b.fromID(RobotID(t.Id()))
-		moves[i+l].Bot = bot
-		moves[i+l].Turn = t
-		moves[i+l].Location = loc
+		id := RobotID(t.Id())
+		loc, bot := b.fromID(id)
+
+		moves[id] = &botMove{
+			Bot:      bot,
+			Turn:     t,
+			Location: loc,
+		}
 	}
+
 	c := make(collisionMap)
 	b.addCollisions(c, moves)
 
@@ -245,12 +277,12 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 
 	b.Round++
 
-	if b.Round%NewBotsSpacing == 0 && b.Round < 100 {
+	if b.Round%NewBotsSpacing == 0 && b.Round < b.config.NumRounds {
 		b.spawnBots()
 	}
 }
 
-func (b *Board) issueAttacks(moves []botMove) {
+func (b *Board) issueAttacks(moves moveMap) {
 	for _, move := range moves {
 		if move.Turn.Which() != botapi.Turn_Which_attack {
 			continue
@@ -265,19 +297,13 @@ func (b *Board) issueAttacks(moves []botMove) {
 
 		// If there's a bot at the attack location, make them sad
 		// You *can* attack your own robots
-		victim := b.Locs[attackLoc]
-		if victim != nil {
-			for _, m := range moves {
-				if m.Bot.ID == victim.ID {
-					b.hurtBot(m, Attack)
-					break
-				}
-			}
+		if victim := b.Cells[attackLoc.X][attackLoc.Y].Bot; victim != nil {
+			b.hurtBot(moves[victim.ID], Attack)
 		}
 	}
 }
 
-func (b *Board) issueSelfDestructs(moves []botMove) {
+func (b *Board) issueSelfDestructs(moves moveMap) {
 	for _, move := range moves {
 		if move.Turn.Which() != botapi.Turn_Which_selfDestruct {
 			continue
@@ -287,14 +313,8 @@ func (b *Board) issueSelfDestructs(moves []botMove) {
 		// (https://www.youtube.com/watch?v=NiM5ARaexPE)
 		for _, boomLoc := range b.surrounding(move.Location) {
 			// If there's a bot in the blast radius
-			victim := b.Locs[boomLoc]
-			if victim != nil {
-				for _, m := range moves {
-					if m.Bot.ID == victim.ID {
-						b.hurtBot(m, Destruct)
-						break
-					}
-				}
+			if victim := b.Cells[boomLoc.X][boomLoc.Y].Bot; victim != nil {
+				b.hurtBot(moves[victim.ID], Destruct)
 			}
 		}
 
@@ -304,10 +324,8 @@ func (b *Board) issueSelfDestructs(moves []botMove) {
 }
 
 func (b *Board) fromID(id RobotID) (Loc, *Robot) {
-	for loc, bot := range b.Locs {
-		if bot.ID == id {
-			return loc, bot
-		}
+	if loc, ex := b.Bots[id]; ex {
+		return loc, b.Cells[loc.X][loc.Y].Bot
 	}
 	return Loc{}, nil
 }
@@ -335,7 +353,7 @@ func (b *Board) surrounding(loc Loc) []Loc {
 	return vLocs
 }
 
-func (b *Board) addCollisions(c collisionMap, moves []botMove) {
+func (b *Board) addCollisions(c collisionMap, moves moveMap) {
 	for _, move := range moves {
 		nextLoc := b.nextLoc(move)
 		// Add where they want to move
@@ -343,7 +361,7 @@ func (b *Board) addCollisions(c collisionMap, moves []botMove) {
 	}
 }
 
-func (b *Board) hurtBot(move botMove, dt DamageType) {
+func (b *Board) hurtBot(move *botMove, dt DamageType) {
 	switch dt {
 	case Self:
 		move.Bot.Health = 0
@@ -363,17 +381,12 @@ func (b *Board) hurtBot(move botMove, dt DamageType) {
 }
 
 func (b *Board) clearTheDead() {
-	var killKeys []Loc
-	for loc, bot := range b.Locs {
-
+	for _, loc := range b.Bots {
+		bot := b.Cells[loc.X][loc.Y].Bot
 		// Smite them
 		if bot.Health <= 0 {
-			killKeys = append(killKeys, loc)
+			b.removeBot(loc)
 		}
-	}
-
-	for _, loc := range killKeys {
-		delete(b.Locs, loc)
 	}
 }
 
@@ -382,8 +395,9 @@ func (b *Board) moveBot(bot *Robot, loc Loc) error {
 	if manhattanDistance(oldLoc, loc) > 1 {
 		return errors.New("Teleporting or some ish")
 	}
-	delete(b.Locs, oldLoc)
-	b.Locs[loc] = bot
+	b.Cells[oldLoc.X][oldLoc.Y].Bot = nil
+	b.Cells[loc.X][loc.Y].Bot = bot
+	b.Bots[bot.ID] = loc
 	return nil
 }
 
@@ -398,7 +412,7 @@ func abs(x int) int {
 	return x
 }
 
-func (b *Board) nextLoc(move botMove) Loc {
+func (b *Board) nextLoc(move *botMove) Loc {
 	currentLoc := b.robotLoc(move.Bot)
 	// If they aren't moving, return their current loc
 	if move.Turn.Which() != botapi.Turn_Which_move {
@@ -437,12 +451,7 @@ func directionOffsets(dir botapi.Direction) (x, y int) {
 }
 
 func (b *Board) robotLoc(r *Robot) Loc {
-	for loc, bot := range b.Locs {
-		if bot.ID == r.ID {
-			return loc
-		}
-	}
-	return Loc{}
+	return b.Bots[r.ID]
 }
 
 // IsFinished reports whether the game is finished.
@@ -450,36 +459,30 @@ func (b *Board) IsFinished() bool {
 	return b.Round >= 100
 }
 
-// At returns the robot at a location or nil if not found.
-func (b *Board) AtXY(x, y int) CellInfo {
-	if !b.isValidLoc(Loc{x, y}) {
-		return CellInfo{
-			Bot:      nil,
-			CellType: Invalid,
-		}
+func (b *Board) At(l Loc) *Robot {
+	if !b.inBounds(l) {
+		return nil
 	}
+	return b.Cells[l.X][l.Y].Bot
+}
 
-	return CellInfo{
-		Bot:      b.Locs[Loc{X: x, Y: y}],
-		CellType: b.Cells[x][y],
-	}
+func (b *Board) inBounds(loc Loc) bool {
+	return loc.X < b.Width() && loc.X >= 0 && loc.Y >= 0 && loc.Y < b.Height()
 }
 
 func (b *Board) isValidLoc(loc Loc) bool {
-	if loc.X >= b.Size.X || loc.X < 0 || loc.Y < 0 || loc.Y >= b.Size.Y {
-		return false
-	}
-	return b.Cells[loc.X][loc.Y] == Valid || b.Cells[loc.X][loc.Y] == Spawn
+	return b.inBounds(loc) &&
+		(b.Cells[loc.X][loc.Y].Type == Valid || b.Cells[loc.X][loc.Y].Type == Spawn)
 }
 
 // ToWire converts the board to the wire representation with respect to the
 // given faction (since the wire factions are us vs. them).
 func (b *Board) ToWire(out botapi.Board, faction int) error {
-	out.SetWidth(uint16(b.Size.X))
-	out.SetHeight(uint16(b.Size.Y))
+	out.SetWidth(uint16(b.Width()))
+	out.SetHeight(uint16(b.Height()))
 	out.SetRound(int32(b.Round))
 
-	robots, err := botapi.NewRobot_List(out.Segment(), int32(len(b.Locs)))
+	robots, err := botapi.NewRobot_List(out.Segment(), int32(len(b.Bots)))
 	if err != nil {
 		return err
 	}
@@ -488,7 +491,8 @@ func (b *Board) ToWire(out botapi.Board, faction int) error {
 	}
 
 	n := 0
-	for loc, r := range b.Locs {
+	for _, loc := range b.Bots {
+		r := b.Cells[loc.X][loc.Y].Bot
 		outr := robots.At(n)
 		outr.SetId(uint32(r.ID))
 		outr.SetX(uint16(loc.X))
@@ -511,7 +515,7 @@ func (b *Board) ToWireWithInitial(out botapi.InitialBoard, faction int) error {
 	wireBoard, err := out.NewBoard()
 	b.ToWire(wireBoard, faction)
 
-	cells, err := botapi.NewCellType_List(out.Segment(), int32(b.Size.X*b.Size.Y))
+	cells, err := botapi.NewCellType_List(out.Segment(), int32(b.Width()*b.Height()))
 	if err != nil {
 		return err
 	}
@@ -522,7 +526,7 @@ func (b *Board) ToWireWithInitial(out botapi.InitialBoard, faction int) error {
 
 	for x, col := range b.Cells {
 		for y, cell := range col {
-			cells.Set(x+y*b.Size.X, cellToWire[cell])
+			cells.Set(x+y*b.Width(), cellToWire[cell.Type])
 		}
 	}
 	return nil

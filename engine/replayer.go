@@ -34,7 +34,7 @@ func NewPlayback(r botapi.Replay) (*Playback, error) {
 }
 
 func boards(replay botapi.Replay) ([]*Board, error) {
-	var cells [][]CellType
+	var cells [][]Cell
 	w, err := replay.Initial()
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func boardFromWire(wire botapi.Board) (*Board, error) {
 			X: int(bot.X()),
 			Y: int(bot.Y()),
 		}
-		b.Locs[loc] = robotFromWire(bot)
+		b.addBot(robotFromWire(bot), loc)
 	}
 
 	return b, nil
@@ -117,7 +117,7 @@ func boardFromWireWithInitial(wire botapi.InitialBoard) (*Board, error) {
 			X: int(bot.X()),
 			Y: int(bot.Y()),
 		}
-		b.Locs[loc] = robotFromWire(bot)
+		b.addBot(robotFromWire(bot), loc)
 	}
 
 	cells, err := wire.Cells()
@@ -128,7 +128,7 @@ func boardFromWireWithInitial(wire botapi.InitialBoard) (*Board, error) {
 	for i := 0; i < cells.Len(); i++ {
 		cell := cells.At(i)
 		x, y := i%w, i/w
-		b.Cells[x][y] = cellFromWire[cell]
+		b.Cells[x][y].Type = cellFromWire[cell]
 	}
 
 	return b, nil
