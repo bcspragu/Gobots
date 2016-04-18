@@ -55,12 +55,12 @@ func TestBoard_Set(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	tests := []struct {
 		config    BoardConfig
-		init      map[Loc]Robot
+		init      map[Loc]*Robot
 		initRound int
 
 		// TODO: parameters for round
 
-		want         map[Loc]Robot
+		want         map[Loc]*Robot
 		wantRound    int
 		turnListFunc func(*capnp.Segment) (botapi.Turn_List, botapi.Turn_List)
 	}{
@@ -69,14 +69,14 @@ func TestUpdate(t *testing.T) {
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
-			init: map[Loc]Robot{
-				Loc{1, 1}: Robot{ID: 123, Health: 10, Faction: 0},
-				Loc{2, 2}: Robot{ID: 456, Health: 10, Faction: 1},
+			init: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 10, Faction: 0},
+				Loc{2, 2}: &Robot{ID: 456, Health: 10, Faction: 1},
 			},
 			initRound: 0,
-			want: map[Loc]Robot{
-				Loc{1, 1}: Robot{ID: 123, Health: 10, Faction: 0},
-				Loc{2, 2}: Robot{ID: 456, Health: 10, Faction: 1},
+			want: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 10, Faction: 0},
+				Loc{2, 2}: &Robot{ID: 456, Health: 10, Faction: 1},
 			},
 			wantRound: 1,
 			turnListFunc: func(s *capnp.Segment) (botapi.Turn_List, botapi.Turn_List) {
@@ -88,14 +88,13 @@ func TestUpdate(t *testing.T) {
 			},
 		},
 	}
-	for i, test := range tests {
-		t.Logf("tests[%d], size = %v, round = %d", i, test.config, test.initRound)
+	for _, test := range tests {
 		b := EmptyBoard(test.config)
 		b.Round = test.initRound
 		for l, r := range test.init {
-			t.Logf("  -> set %v to %#v", l, r)
-			rr := new(Robot)
-			b.addBot(rr, l)
+			b.addBot(r, l)
+			t.Logf("%#v", b.Cells[1][1].Bot)
+			t.Logf("%#v", b.Cells[2][2].Bot)
 		}
 
 		_, s, err := capnp.NewMessage(capnp.SingleSegment(nil))
@@ -106,28 +105,13 @@ func TestUpdate(t *testing.T) {
 		b.Update(ta, tb)
 
 		if b.Round != test.wantRound {
-			t.Errorf("  !! b.Round = %d; want %d", b.Round, test.wantRound)
+			t.Errorf("b.Round = %d; want %d", b.Round, test.wantRound)
 		}
 
-		for y := 0; y < test.config.Size.Y; y++ {
-			for x := 0; x < test.config.Size.X; x++ {
-				loc := Loc{x, y}
-				r := b.At(loc)
-				want, ok := test.want[loc]
-				if (r != nil) != ok {
-					if ok {
-						t.Errorf("  !! b.At(%v) = nil; want %#v", loc, want)
-					} else {
-						t.Errorf("  !! b.At(%v) = %#v; want nil", loc, r)
-					}
-					continue
-				}
-				if !ok {
-					continue
-				}
-				if *r != want {
-					t.Errorf("  !! b.At(%v) = %#v; want %#v", loc, r, want)
-				}
+		for l, bot := range test.want {
+			r := b.At(l)
+			if *r != *bot {
+				t.Errorf("b.At(%v) = %#v; want %#v", l, *r, bot)
 			}
 		}
 	}
