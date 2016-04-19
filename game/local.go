@@ -73,7 +73,7 @@ func fightN(f1, f2 Factory, n int) []MatchResult {
 	// Run the game
 	for i := 0; i < n; i++ {
 		b := engine.EmptyBoard(engine.DefaultConfig)
-		b.InitBoard(engine.DefaultConfig)
+		b.InitBoard()
 
 		for !b.IsFinished() {
 			turnCtx, _ := context.WithTimeout(ctx, 30*time.Second)
