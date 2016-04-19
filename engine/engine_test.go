@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/bcspragu/Gobots/botapi"
@@ -29,7 +31,7 @@ func TestEmptyBoardIsEmpty(t *testing.T) {
 	}
 }
 
-func TestBoard_Set(t *testing.T) {
+func TestBoard_addBot(t *testing.T) {
 	b := EmptyBoard(testConfig)
 	loc := Loc{1, 2}
 	b.addBot(&Robot{
@@ -58,13 +60,12 @@ func TestUpdate(t *testing.T) {
 		init      map[Loc]*Robot
 		initRound int
 
-		// TODO: parameters for round
-
-		want         map[Loc]*Robot
-		wantRound    int
-		turnListFunc func(*capnp.Segment) (botapi.Turn_List, botapi.Turn_List)
+		want      map[Loc]*Robot
+		wantRound int
+		turnList1 string
+		turnList2 string
 	}{
-		// TODO: This is no-op update change detector test.
+		// This is no-op update change detector test case
 		{
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
@@ -79,29 +80,101 @@ func TestUpdate(t *testing.T) {
 				Loc{2, 2}: &Robot{ID: 456, Health: 10, Faction: 1},
 			},
 			wantRound: 1,
-			turnListFunc: func(s *capnp.Segment) (botapi.Turn_List, botapi.Turn_List) {
-				l, err := botapi.NewTurn_List(s, 0)
-				if err != nil {
-					t.Fatal("botapi.NewTurn_List:", err)
-				}
-				return l, l
+			turnList1: "123:W",
+			turnList2: "456:W",
+		},
+		// This checks basic attacking
+		{
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
 			},
+			init: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 10, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+			},
+			wantRound: 1,
+			turnList1: "123:W",
+			turnList2: "456:AW",
+		},
+		// This checks guarding from an attack
+		{
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
+			},
+			init: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 15, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+			},
+			wantRound: 1,
+			turnList1: "123:G",
+			turnList2: "456:AW",
+		},
+		// This checks self-destructing
+		{
+			config: BoardConfig{
+				Size:      Loc{X: 5, Y: 5},
+				CellTyper: allValid{},
+				Spawner:   noSpawn{},
+			},
+			init: map[Loc]*Robot{
+				Loc{4, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction}, // Out of blast radius
+				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction}, // Exploder
+
+				Loc{1, 0}: &Robot{ID: 124, Health: 20, Faction: P1Faction}, // In blast radius
+				Loc{2, 0}: &Robot{ID: 125, Health: 20, Faction: P1Faction}, // In blast radius
+				Loc{3, 0}: &Robot{ID: 126, Health: 20, Faction: P1Faction}, // In blast radius
+				Loc{1, 1}: &Robot{ID: 127, Health: 20, Faction: P1Faction}, // In blast radius
+				Loc{3, 1}: &Robot{ID: 128, Health: 20, Faction: P1Faction}, // In blast radius
+				Loc{1, 2}: &Robot{ID: 129, Health: 20, Faction: P1Faction}, // In blast radius
+				Loc{2, 2}: &Robot{ID: 130, Health: 20, Faction: P1Faction}, // In blast radius
+				Loc{3, 2}: &Robot{ID: 131, Health: 20, Faction: P1Faction}, // In blast radius
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{4, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+
+				Loc{1, 0}: &Robot{ID: 124, Health: 5, Faction: P1Faction}, // In blast radius
+				Loc{2, 0}: &Robot{ID: 125, Health: 5, Faction: P1Faction}, // In blast radius
+				Loc{3, 0}: &Robot{ID: 126, Health: 5, Faction: P1Faction}, // In blast radius
+				Loc{1, 1}: &Robot{ID: 127, Health: 5, Faction: P1Faction}, // In blast radius
+				Loc{3, 1}: &Robot{ID: 128, Health: 5, Faction: P1Faction}, // In blast radius
+				Loc{1, 2}: &Robot{ID: 129, Health: 5, Faction: P1Faction}, // In blast radius
+				Loc{2, 2}: &Robot{ID: 130, Health: 5, Faction: P1Faction}, // In blast radius
+				Loc{3, 2}: &Robot{ID: 131, Health: 5, Faction: P1Faction}, // In blast radius
+			},
+			wantRound: 1,
+			turnList1: "123:W,124:W,125:W,126:W,127:W,128:W,129:W,130:W,131:W",
+			turnList2: "456:D",
 		},
 	}
 	for _, test := range tests {
 		b := EmptyBoard(test.config)
+		if test.config.CellTyper != nil {
+			b.InitBoard()
+		}
 		b.Round = test.initRound
 		for l, r := range test.init {
 			b.addBot(r, l)
-			t.Logf("%#v", b.Cells[1][1].Bot)
-			t.Logf("%#v", b.Cells[2][2].Bot)
 		}
 
-		_, s, err := capnp.NewMessage(capnp.SingleSegment(nil))
+		ta, err := turnList(test.turnList1)
 		if err != nil {
-			t.Fatal("capnp.NewMessage:", err)
+			t.Fatal("turnList:", err)
 		}
-		ta, tb := test.turnListFunc(s)
+		tb, err := turnList(test.turnList2)
+		if err != nil {
+			t.Fatal("turnList:", err)
+		}
 		b.Update(ta, tb)
 
 		if b.Round != test.wantRound {
@@ -111,7 +184,7 @@ func TestUpdate(t *testing.T) {
 		for l, bot := range test.want {
 			r := b.At(l)
 			if *r != *bot {
-				t.Errorf("b.At(%v) = %#v; want %#v", l, *r, bot)
+				t.Errorf("b.At(%v) = %#v; want %#v", l, *r, *bot)
 			}
 		}
 	}
@@ -179,4 +252,52 @@ func TestToWire(t *testing.T) {
 	} else {
 		t.Errorf("robots error: %v", err)
 	}
+}
+
+var dMap = map[byte]botapi.Direction{
+	'N': botapi.Direction_north,
+	'S': botapi.Direction_south,
+	'E': botapi.Direction_east,
+	'W': botapi.Direction_west,
+}
+
+func turnList(t string) (botapi.Turn_List, error) {
+	_, s, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	if err != nil {
+		return botapi.Turn_List{}, err
+	}
+
+	moves := strings.Split(t, ",")
+	l, err := botapi.NewTurn_List(s, int32(len(moves)))
+	if err != nil {
+		return l, err
+	}
+	for i, m := range moves {
+		t := l.At(i)
+		p := strings.Split(m, ":")
+		id, err := strconv.Atoi(p[0])
+		if err != nil {
+			return l, err
+		}
+		t.SetId(uint32(id))
+		move := p[1]
+		switch move[0] {
+		// Wait
+		case 'W':
+			t.SetWait()
+		// Move
+		case 'M':
+			t.SetMove(dMap[move[1]])
+		// Attack
+		case 'A':
+			t.SetAttack(dMap[move[1]])
+		// Destruct
+		case 'D':
+			t.SetSelfDestruct()
+		// Guard
+		case 'G':
+			t.SetGuard()
+		}
+	}
+	return l, nil
 }

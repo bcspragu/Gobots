@@ -16,6 +16,10 @@ var (
 	EveryOtherSpawn Spawner = everyOtherSpawn{}
 )
 
+type noSpawn struct{}
+
+func (noSpawn) Spawn(locs []Loc) []Loc { return []Loc{} }
+
 type allSpawn struct{}
 
 func (allSpawn) Spawn(locs []Loc) []Loc { return locs }

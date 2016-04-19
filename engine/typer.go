@@ -7,6 +7,12 @@ type Typer interface {
 	Type(x, y int) CellType
 }
 
+type allValid struct{}
+
+func (allValid) Type(x, y int) CellType {
+	return Valid
+}
+
 type baseCircle struct {
 	size Loc
 	c    [][]CellType

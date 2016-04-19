@@ -3,7 +3,7 @@ package engine
 import (
 	"errors"
 	"fmt"
-	"strconv"
+	"sort"
 
 	"github.com/bcspragu/Gobots/botapi"
 )
@@ -489,10 +489,19 @@ func (b *Board) ToWire(out botapi.Board, faction int) error {
 		return err
 	}
 
+	bots := make([]*Robot, len(b.Bots))
+
 	n := 0
 	for _, loc := range b.Bots {
-		r := b.Cells[loc.X][loc.Y].Bot
-		outr := robots.At(n)
+		bots[n] = b.Cells[loc.X][loc.Y].Bot
+		n++
+	}
+
+	sort.Sort(ByID(bots))
+
+	for i, r := range bots {
+		loc := b.Bots[r.ID]
+		outr := robots.At(i)
 		outr.SetId(uint32(r.ID))
 		outr.SetX(uint16(loc.X))
 		outr.SetY(uint16(loc.Y))
@@ -502,7 +511,6 @@ func (b *Board) ToWire(out botapi.Board, faction int) error {
 		} else {
 			outr.SetFaction(botapi.Faction_opponent)
 		}
-		n++
 	}
 	return nil
 }
@@ -529,23 +537,6 @@ func (b *Board) ToWireWithInitial(out botapi.InitialBoard, faction int) error {
 		}
 	}
 	return nil
-}
-
-// A Robot is a single piece on a board.
-type Robot struct {
-	ID      RobotID
-	Health  int
-	Faction int
-}
-
-type RobotID uint32
-
-func (id RobotID) String() string {
-	return strconv.FormatUint(uint64(id), 10)
-}
-
-func (id RobotID) GoString() string {
-	return id.String()
 }
 
 // Loc is a position on a board.
