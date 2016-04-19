@@ -83,6 +83,65 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:W",
 			turnList2: "456:W",
 		},
+		// This checks a simple collision
+		{
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
+			},
+			init: map[Loc]*Robot{
+				Loc{0, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{0, 1}: &Robot{ID: 123, Health: 15, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 15, Faction: P2Faction},
+			},
+			wantRound: 1,
+			turnList1: "123:ME",
+			turnList2: "456:MW",
+		},
+		// This checks four bots moving in a windmill, none should collide
+		{
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
+			},
+			init: map[Loc]*Robot{
+				Loc{0, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{1, 0}: &Robot{ID: 124, Health: 20, Faction: P1Faction},
+				Loc{1, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+				Loc{0, 0}: &Robot{ID: 457, Health: 20, Faction: P2Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{0, 0}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{1, 1}: &Robot{ID: 124, Health: 20, Faction: P1Faction},
+				Loc{0, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+				Loc{1, 0}: &Robot{ID: 457, Health: 20, Faction: P2Faction},
+			},
+			wantRound: 1,
+			turnList1: "123:MN,124:MS",
+			turnList2: "456:MW,457:ME",
+		},
+		// This checks two bots trying to swap places, which isn't allowed. They
+		// collide instead.
+		{
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
+			},
+			init: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 15, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 15, Faction: P2Faction},
+			},
+			wantRound: 1,
+			turnList1: "123:ME",
+			turnList2: "456:MW",
+		},
 		// This checks basic attacking
 		{
 			config: BoardConfig{
@@ -119,12 +178,47 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:G",
 			turnList2: "456:AW",
 		},
-		// This checks self-destructing
+		// This checks guarding from a self-destruct
+		{
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
+			},
+			init: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 13, Faction: P1Faction},
+			},
+			wantRound: 1,
+			turnList1: "123:G",
+			turnList2: "456:D",
+		},
+		// This checks guarding from a collision
 		{
 			config: BoardConfig{
 				Size:      Loc{X: 5, Y: 5},
 				CellTyper: allValid{},
 				Spawner:   noSpawn{},
+			},
+			init: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{2, 1}: &Robot{ID: 456, Health: 15, Faction: P2Faction},
+			},
+			wantRound: 1,
+			turnList1: "123:G",
+			turnList2: "456:MW",
+		},
+		// This checks self-destructing
+		{
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
 			},
 			init: map[Loc]*Robot{
 				Loc{4, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction}, // Out of blast radius
@@ -158,10 +252,14 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		b := EmptyBoard(test.config)
-		if test.config.CellTyper != nil {
-			b.InitBoard()
+		if test.config.CellTyper == nil {
+			test.config.CellTyper = allValid{}
 		}
+		if test.config.Spawner == nil {
+			test.config.Spawner = noSpawn{}
+		}
+		b := EmptyBoard(test.config)
+		b.InitBoard()
 		b.Round = test.initRound
 		for l, r := range test.init {
 			b.addBot(r, l)

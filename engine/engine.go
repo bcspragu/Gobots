@@ -33,8 +33,9 @@ type (
 	CellType   int
 	DamageType int
 
-	collisionMap map[Loc][]*botMove
-	moveMap      map[RobotID]*botMove
+	collisionMap    map[Loc][]*botMove
+	intersectionMap map[Intersection][]*botMove
+	moveMap         map[RobotID]*botMove
 
 	botMove struct {
 		Bot      *Robot
@@ -77,6 +78,11 @@ var (
 	}
 )
 
+type LocPair struct {
+	Old Loc
+	New Loc
+}
+
 type Board struct {
 	Cells [][]Cell
 	Bots  map[RobotID]Loc
@@ -84,8 +90,9 @@ type Board struct {
 	Round  int
 	NextID RobotID
 
-	config   BoardConfig
-	p1Spawns []Loc
+	config       BoardConfig
+	p1Spawns     []Loc
+	pendingMoves map[*Robot]LocPair
 }
 
 type BoardConfig struct {
@@ -232,26 +239,37 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 		}
 	}
 
+	// TODO: Clean up collision/intersection checking code
 	c := make(collisionMap)
-	b.addCollisions(c, moves)
+	i := make(intersectionMap)
+	b.addCollisions(c, i, moves)
 
-	// Move the bots to their new locations, unless they collide with something,
-	// in which case just subtract 1 from their health and don't move them.
-
-	// TODO: This allows bots to swap places, which isn't allowed in the original
-	// game.
+	// Clear updates
+	b.pendingMoves = make(map[*Robot]LocPair)
 	for loc, ms := range c {
 		// If there's only one bot trying to get somewhere, just move them there
 		if len(ms) == 1 {
-			b.moveBot(ms[0].Bot, loc)
+			b.prepMove(ms[0].Bot, loc)
 		} else {
 			// Multiple bots, hurt 'em
 			for _, m := range ms {
 				b.hurtBot(m, Collision)
 			}
 		}
-
 	}
+
+	for _, ms := range i {
+		// If there's more than one bot travelling through a location, don't allow it
+		if len(ms) > 1 {
+			// Multiple bots, hurt 'em
+			for _, m := range ms {
+				// "Unaccept" their move
+				delete(b.pendingMoves, m.Bot)
+				b.hurtBot(m, Collision)
+			}
+		}
+	}
+	b.executeMoves()
 	// Get rid of anyone who died in a collision
 	b.clearTheDead()
 
@@ -352,11 +370,16 @@ func (b *Board) surrounding(loc Loc) []Loc {
 	return vLocs
 }
 
-func (b *Board) addCollisions(c collisionMap, moves moveMap) {
+func (b *Board) addCollisions(c collisionMap, i intersectionMap, moves moveMap) {
 	for _, move := range moves {
 		nextLoc := b.nextLoc(move)
 		// Add where they want to move
 		c[nextLoc] = append(c[nextLoc], move)
+		in := Intersection{
+			X: move.Location.X + nextLoc.X,
+			Y: move.Location.Y + nextLoc.Y,
+		}
+		i[in] = append(i[in], move)
 	}
 }
 
@@ -389,15 +412,28 @@ func (b *Board) clearTheDead() {
 	}
 }
 
-func (b *Board) moveBot(bot *Robot, loc Loc) error {
+func (b *Board) prepMove(bot *Robot, loc Loc) error {
 	oldLoc := b.robotLoc(bot)
 	if manhattanDistance(oldLoc, loc) > 1 {
 		return errors.New("Teleporting or some ish")
 	}
-	b.Cells[oldLoc.X][oldLoc.Y].Bot = nil
-	b.Cells[loc.X][loc.Y].Bot = bot
-	b.Bots[bot.ID] = loc
+	b.pendingMoves[bot] = LocPair{Old: oldLoc, New: loc}
 	return nil
+}
+
+func (b *Board) executeMoves() {
+	for bot, loc := range b.pendingMoves {
+		b.Cells[loc.New.X][loc.New.Y].Bot = bot
+		b.Bots[bot.ID] = loc.New
+	}
+
+	// Check the old locations and see if something new has moved in. If not,
+	// clear it out.
+	for bot, loc := range b.pendingMoves {
+		if oldBot := b.Cells[loc.Old.X][loc.Old.Y].Bot; oldBot != nil && oldBot.ID == bot.ID && loc.Old != loc.New {
+			b.Cells[loc.Old.X][loc.Old.Y].Bot = nil
+		}
+	}
 }
 
 func manhattanDistance(loc1, loc2 Loc) int {
@@ -412,6 +448,7 @@ func abs(x int) int {
 }
 
 func (b *Board) nextLoc(move *botMove) Loc {
+	fmt.Printf("Move: %#v\n", move)
 	currentLoc := b.robotLoc(move.Bot)
 	// If they aren't moving, return their current loc
 	if move.Turn.Which() != botapi.Turn_Which_move {
@@ -541,6 +578,11 @@ func (b *Board) ToWireWithInitial(out botapi.InitialBoard, faction int) error {
 
 // Loc is a position on a board.
 type Loc struct {
+	X, Y int
+}
+
+// Intersection is the line between two positions, multipled by two
+type Intersection struct {
 	X, Y int
 }
 
