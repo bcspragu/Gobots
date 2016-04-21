@@ -2,11 +2,18 @@ package engine
 
 import "strconv"
 
+type Faction int
+
+const (
+	P1Faction Faction = iota + 1
+	P2Faction
+)
+
 // A Robot is a single piece on a board.
 type Robot struct {
 	ID      RobotID
 	Health  int
-	Faction int
+	Faction Faction
 }
 
 // ByID implements sort.Interface for a slice of robots

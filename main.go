@@ -94,7 +94,6 @@ func serveGame(c context) error {
 	if err != nil {
 		return err
 	}
-
 	var buf bytes.Buffer
 	err = gob.NewEncoder(&buf).Encode(p)
 	if err != nil {

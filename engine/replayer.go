@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"log"
-
 	"github.com/bcspragu/Gobots/botapi"
 	"github.com/gopherjs/gopherjs/js"
 )
@@ -62,7 +60,11 @@ func boards(replay botapi.Replay) ([]*Board, error) {
 		if err != nil {
 			return nil, err
 		}
-		b.Cells = cells
+		for x := 0; x < b.Width(); x++ {
+			for y := 0; y < b.Height(); y++ {
+				b.Cells[x][y].Type = cells[x][y].Type
+			}
+		}
 		bs[i+1] = b
 	}
 	return bs, nil
@@ -109,7 +111,6 @@ func boardFromWireWithInitial(wire botapi.InitialBoard) (*Board, error) {
 	if err != nil {
 		return b, err
 	}
-	log.Printf("BoardFromWireWithInitial: Loaded %d bots", bots.Len())
 
 	for i := 0; i < bots.Len(); i++ {
 		bot := bots.At(i)
@@ -135,7 +136,7 @@ func boardFromWireWithInitial(wire botapi.InitialBoard) (*Board, error) {
 }
 
 func robotFromWire(wire botapi.Robot) *Robot {
-	var faction int
+	var faction Faction
 	if wire.Faction() == botapi.Faction_mine {
 		faction = P1Faction
 	} else {

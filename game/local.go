@@ -12,6 +12,8 @@ import (
 	"zombiezen.com/go/capnproto2/rpc"
 )
 
+// TODO: Offer a gdb-style/ncurses live board using the printBoard() function you already wrote
+
 type localAI struct {
 	botapi.Ai
 }
@@ -89,7 +91,7 @@ func fightN(f1, f2 Factory, n int) []MatchResult {
 	return matchRes
 }
 
-func (la *localAI) takeTurn(ctx context.Context, gid string, b *engine.Board, faction int) (botapi.Turn_List, error) {
+func (la *localAI) takeTurn(ctx context.Context, gid string, b *engine.Board, faction engine.Faction) (botapi.Turn_List, error) {
 	// TODO Probably don't ignore errors
 	res, _ := la.TakeTurn(ctx, func(p botapi.Ai_takeTurn_Params) error {
 		iwb, err := p.NewBoard()

@@ -2,20 +2,16 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
-	"os"
 
 	"github.com/bcspragu/Gobots/game"
 )
 
 var token string
-var flags = flag.NewFlagSet("program flags", flag.ContinueOnError)
-var botName = flags.String("bot_name", "aggro", "which bot to use")
+var botName = flag.String("bot_name", "aggro", "which bot to use")
 
 func main() {
-	flags.StringVar(&token, "token", "", "which token to connect to the server with")
-	flags.SetOutput(ioutil.Discard)
-	flags.Parse(os.Args[1:])
+	flag.StringVar(&token, "token", "", "which token to connect to the server with")
+	flag.Parse()
 	if token == "" {
 		token = "HAXWUumlfiJekSXfwAHQlttHH"
 	}
@@ -31,7 +27,9 @@ func main() {
 	case "sunguard":
 		g = sunguard{}
 	}
-	game.StartServerForFactory(*botName, token, game.ToFactory(g))
+	game.StartServerForFactoryWithConfig(*botName, token, game.ToFactory(g), game.ServerConfig{
+		Addr: "localhost:8001",
+	})
 
 	//res := game.FightBotsN(game.ToFactory(g), game.ToFactory(&pathfinder{}), 1)
 	//for _, m := range res {

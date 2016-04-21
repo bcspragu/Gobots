@@ -9,9 +9,6 @@ import (
 )
 
 const (
-	P1Faction = 1
-	P2Faction = 2
-
 	InitialHealth = 50
 
 	CollisionDamage = 5
@@ -76,6 +73,9 @@ var (
 		botapi.CellType_valid:   Valid,
 		botapi.CellType_spawn:   Spawn,
 	}
+
+	OutOfBounds     = errors.New("Out of Bounds")
+	AlreadyOccupied = errors.New("Already Occupied")
 )
 
 type LocPair struct {
@@ -90,7 +90,7 @@ type Board struct {
 	Round  int
 	NextID RobotID
 
-	config       BoardConfig
+	Config       BoardConfig
 	p1Spawns     []Loc
 	pendingMoves map[*Robot]LocPair
 }
@@ -109,7 +109,7 @@ var DefaultConfig = BoardConfig{
 	NumRounds: 100,
 }
 
-func (b *Board) BotCount(faction int) (n int) {
+func (b *Board) BotCount(faction Faction) (n int) {
 	for _, loc := range b.Bots {
 		bot := b.Cells[loc.X][loc.Y].Bot
 		if bot.Faction == faction {
@@ -128,7 +128,7 @@ func EmptyBoard(bc BoardConfig) *Board {
 	b := &Board{
 		Bots:   make(map[RobotID]Loc),
 		Cells:  make([][]Cell, bc.Size.X),
-		config: bc,
+		Config: bc,
 	}
 
 	// TODO: Use other, more efficient allocation method
@@ -140,17 +140,17 @@ func EmptyBoard(bc BoardConfig) *Board {
 }
 
 func (b *Board) Width() int {
-	return b.config.Size.X
+	return b.Config.Size.X
 }
 
 func (b *Board) Height() int {
-	return b.config.Size.Y
+	return b.Config.Size.Y
 }
 
 func (b *Board) InitBoard() {
 	for x := 0; x < b.Width(); x++ {
 		for y := 0; y < b.Height(); y++ {
-			t := b.config.CellTyper.Type(x, y)
+			t := b.Config.CellTyper.Type(x, y)
 			b.Cells[x][y].Type = t
 			// TODO: New scheme to allow for bots spawning differently
 			if t == Spawn && x < b.Width()/2 {
@@ -186,6 +186,31 @@ func (b *Board) removeBot(l Loc) {
 	}
 }
 
+func (b *Board) moveBot(bot *Robot, l LocPair) error {
+	if !b.inBounds(l.Old) || !b.inBounds(l.New) {
+		return OutOfBounds
+	}
+
+	if l.Old == l.New {
+		return nil
+	}
+
+	if b.Cells[l.New.X][l.New.Y].Bot != nil {
+		return AlreadyOccupied
+	}
+
+	b.Cells[l.New.X][l.New.Y].Bot = bot
+	b.Bots[bot.ID] = l.New
+
+	// Check the old locations and see if something new has moved in. If not,
+	// clear it out.
+	if oldBot := b.Cells[l.Old.X][l.Old.Y].Bot; oldBot != nil && oldBot.ID == bot.ID && l.Old != l.New {
+		fmt.Printf("Removing %d from %v because they're at %v\n", bot.ID, l.Old, l.New)
+		b.Cells[l.Old.X][l.Old.Y].Bot = nil
+	}
+	return nil
+}
+
 func (b *Board) spawnBots() {
 	// Clear out the spawn zone
 	for _, locA := range b.p1Spawns {
@@ -195,7 +220,7 @@ func (b *Board) spawnBots() {
 	}
 
 	// Spawn() returns the list of locations to spawn bots at
-	for _, locA := range b.config.Spawner.Spawn(b.p1Spawns) {
+	for _, locA := range b.Config.Spawner.Spawn(b.p1Spawns) {
 		locB := Loc{b.Width() - 1 - locA.X, locA.Y}
 
 		b.addBot(&Robot{
@@ -212,37 +237,55 @@ func (b *Board) spawnBots() {
 	}
 }
 
+// TODO: Don't trust the client so much, someone not using the `game` package
+// could easily crash any of this. Problems:
+// - We don't check if robot IDS
+// - We assume that each list contains a move for each robot
+
+func (b *Board) addMoves(tl botapi.Turn_List, m moveMap, f Faction) {
+	for i := 0; i < tl.Len(); i++ {
+		t := tl.At(i)
+		id := RobotID(t.Id())
+		loc, bot := b.fromID(id)
+		// Ignore the move if that bot doesn't exist or isn't owned by the right
+		// player
+		if bot == nil || (bot != nil && bot.Faction != f) {
+			continue
+		}
+
+		m[id] = &botMove{
+			Bot:      bot,
+			Turn:     t,
+			Location: loc,
+		}
+	}
+}
+
 func (b *Board) Update(ta, tb botapi.Turn_List) {
 	// Put all the moves and bots into a map
 	moves := make(moveMap)
-	for i := 0; i < ta.Len(); i++ {
-		t := ta.At(i)
-		id := RobotID(t.Id())
-		loc, bot := b.fromID(id)
+	b.addMoves(ta, moves, P1Faction)
+	b.addMoves(tb, moves, P2Faction)
 
-		moves[id] = &botMove{
-			Bot:      bot,
-			Turn:     t,
-			Location: loc,
-		}
+	// Diagnostic stuff
+	for _, move := range moves {
+		fmt.Printf("Bot %d is at %v doing %s\n", move.Bot.ID, move.Location, move.Turn.Which().String())
 	}
-
-	for i := 0; i < tb.Len(); i++ {
-		t := tb.At(i)
-		id := RobotID(t.Id())
-		loc, bot := b.fromID(id)
-
-		moves[id] = &botMove{
-			Bot:      bot,
-			Turn:     t,
-			Location: loc,
-		}
+	for i, loc := range b.Bots {
+		fmt.Printf("b.Bots has %d at %v\n", i, loc)
 	}
+	b.printBoard()
+	// TODO: READ THIS: We figured out the issue. The problem is that we don't
+	// unravel which updates did happen and which didn't happen. We're saying
+	// that someone can move into a new space even when someone else failed to
+	// move out of it because of a collision. We need to rewrite this to look for
+	// that.
 
 	// TODO: Clean up collision/intersection checking code
 	c := make(collisionMap)
 	i := make(intersectionMap)
-	b.addCollisions(c, i, moves)
+	b.addCollisions(c, moves)
+	b.addIntersections(i, moves)
 
 	// Clear updates
 	b.pendingMoves = make(map[*Robot]LocPair)
@@ -252,9 +295,12 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 			b.prepMove(ms[0].Bot, loc)
 		} else {
 			// Multiple bots, hurt 'em
+			fmt.Print("Collision between")
 			for _, m := range ms {
+				fmt.Print(" ", m.Bot.ID)
 				b.hurtBot(m, Collision)
 			}
+			fmt.Println("")
 		}
 	}
 
@@ -264,6 +310,7 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 			// Multiple bots, hurt 'em
 			for _, m := range ms {
 				// "Unaccept" their move
+				fmt.Println("Removing pending move %v for %d\n", b.pendingMoves[m.Bot], m.Bot.ID)
 				delete(b.pendingMoves, m.Bot)
 				b.hurtBot(m, Collision)
 			}
@@ -292,9 +339,9 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 	// Get rid of anyone killed in some kamikaze-shenanigans
 	b.clearTheDead()
 
+	fmt.Println("Finished Round ", b.Round)
 	b.Round++
-
-	if b.Round%NewBotsSpacing == 0 && b.Round < b.config.NumRounds {
+	if b.Round%NewBotsSpacing == 0 && b.Round < b.Config.NumRounds {
 		b.spawnBots()
 	}
 }
@@ -370,11 +417,18 @@ func (b *Board) surrounding(loc Loc) []Loc {
 	return vLocs
 }
 
-func (b *Board) addCollisions(c collisionMap, i intersectionMap, moves moveMap) {
+func (b *Board) addCollisions(c collisionMap, moves moveMap) {
+	for _, move := range moves {
+		// Add where they want to move
+		nextLoc := b.nextLoc(move)
+		c[nextLoc] = append(c[nextLoc], move)
+	}
+}
+
+func (b *Board) addIntersections(i intersectionMap, moves moveMap) {
 	for _, move := range moves {
 		nextLoc := b.nextLoc(move)
-		// Add where they want to move
-		c[nextLoc] = append(c[nextLoc], move)
+		// Add where they'll be passing through
 		in := Intersection{
 			X: move.Location.X + nextLoc.X,
 			Y: move.Location.Y + nextLoc.Y,
@@ -403,10 +457,14 @@ func (b *Board) hurtBot(move *botMove, dt DamageType) {
 }
 
 func (b *Board) clearTheDead() {
-	for _, loc := range b.Bots {
+	for i, loc := range b.Bots {
 		bot := b.Cells[loc.X][loc.Y].Bot
+		if bot == nil {
+			fmt.Printf("b.Bots thinks %d: %#v, but b.Cells thinks it's nil\n", i, loc)
+		}
 		// Smite them
 		if bot.Health <= 0 {
+			fmt.Printf("Killing %d because their health is %d\n", bot.ID, bot.Health)
 			b.removeBot(loc)
 		}
 	}
@@ -417,22 +475,14 @@ func (b *Board) prepMove(bot *Robot, loc Loc) error {
 	if manhattanDistance(oldLoc, loc) > 1 {
 		return errors.New("Teleporting or some ish")
 	}
+	fmt.Printf("Adding pending move from %v to %v for %d\n", oldLoc, loc, bot.ID)
 	b.pendingMoves[bot] = LocPair{Old: oldLoc, New: loc}
 	return nil
 }
 
 func (b *Board) executeMoves() {
 	for bot, loc := range b.pendingMoves {
-		b.Cells[loc.New.X][loc.New.Y].Bot = bot
-		b.Bots[bot.ID] = loc.New
-	}
-
-	// Check the old locations and see if something new has moved in. If not,
-	// clear it out.
-	for bot, loc := range b.pendingMoves {
-		if oldBot := b.Cells[loc.Old.X][loc.Old.Y].Bot; oldBot != nil && oldBot.ID == bot.ID && loc.Old != loc.New {
-			b.Cells[loc.Old.X][loc.Old.Y].Bot = nil
-		}
+		b.moveBot(bot, loc)
 	}
 }
 
@@ -448,7 +498,6 @@ func abs(x int) int {
 }
 
 func (b *Board) nextLoc(move *botMove) Loc {
-	fmt.Printf("Move: %#v\n", move)
 	currentLoc := b.robotLoc(move.Bot)
 	// If they aren't moving, return their current loc
 	if move.Turn.Which() != botapi.Turn_Which_move {
@@ -513,7 +562,7 @@ func (b *Board) isValidLoc(loc Loc) bool {
 
 // ToWire converts the board to the wire representation with respect to the
 // given faction (since the wire factions are us vs. them).
-func (b *Board) ToWire(out botapi.Board, faction int) error {
+func (b *Board) ToWire(out botapi.Board, faction Faction) error {
 	out.SetWidth(uint16(b.Width()))
 	out.SetHeight(uint16(b.Height()))
 	out.SetRound(int32(b.Round))
@@ -555,7 +604,7 @@ func (b *Board) ToWire(out botapi.Board, faction int) error {
 // ToWireWithInitial converts the board to the wire representation with respect
 // to the given faction (since the wire factions are us vs. them), including
 // information about which cells are which type.
-func (b *Board) ToWireWithInitial(out botapi.InitialBoard, faction int) error {
+func (b *Board) ToWireWithInitial(out botapi.InitialBoard, faction Faction) error {
 	wireBoard, err := out.NewBoard()
 	b.ToWire(wireBoard, faction)
 
@@ -595,4 +644,19 @@ func absFloat(x float64) float64 {
 		return -x
 	}
 	return x
+}
+
+func (b *Board) printBoard() {
+	for y := 0; y < b.Height(); y++ {
+		for x := 0; x < b.Width(); x++ {
+			if b.Cells[x][y].Type == Invalid {
+				fmt.Print("[x]")
+			} else if b.Cells[x][y].Bot == nil {
+				fmt.Print("[ ]")
+			} else {
+				fmt.Print("[", b.Cells[x][y].Bot.ID, "]")
+			}
+		}
+		fmt.Println("")
+	}
 }

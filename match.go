@@ -227,7 +227,7 @@ type turnResult struct {
 	err     turnError
 }
 
-func (oa *onlineAI) takeTurn(ctx gocontext.Context, gid gameID, b *engine.Board, faction int, ch chan<- turnResult) {
+func (oa *onlineAI) takeTurn(ctx gocontext.Context, gid gameID, b *engine.Board, faction engine.Faction, ch chan<- turnResult) {
 	results, err := oa.client.TakeTurn(ctx, func(p botapi.Ai_takeTurn_Params) error {
 		iwb, err := p.NewBoard()
 		if err != nil {

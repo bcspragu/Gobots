@@ -9,7 +9,7 @@
       <div class="gameBoardContainer col-centered">
         <div class="gameBoard">
           <div class="row" ng-repeat="row in game.rows track by $index">
-            <div class="cell" ng-repeat="cell in row track by $index" ng-class="{gopher: cell.Bot !== null, invalid: cell.CellType == 0, spawn: cell.CellType == 2}">
+            <div class="cell" ng-repeat="cell in row track by $index" ng-class="{gopher: cell.Bot !== null, invalid: cell.Type == 0, spawn: cell.Type == 2}">
               <div class="gobot" ng-class="{red: cell.Bot.Faction == 1, blue: cell.Bot.Faction == 2}" ng-show="cell.Bot !== null">
                 [[ cell.Bot.Health ]]
               </div>
