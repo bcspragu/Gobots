@@ -101,6 +101,34 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:ME",
 			turnList2: "456:MW",
 		},
+		// This checks a complicated dependency chain that needs to be unravelled
+		{
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
+			},
+			init: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 1, Health: 20, Faction: P1Faction},
+				Loc{3, 1}: &Robot{ID: 2, Health: 20, Faction: P1Faction},
+				Loc{2, 0}: &Robot{ID: 3, Health: 20, Faction: P1Faction},
+				Loc{1, 2}: &Robot{ID: 4, Health: 20, Faction: P1Faction},
+				Loc{0, 2}: &Robot{ID: 5, Health: 20, Faction: P1Faction},
+				Loc{0, 1}: &Robot{ID: 6, Health: 20, Faction: P1Faction},
+				Loc{3, 2}: &Robot{ID: 7, Health: 20, Faction: P1Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{1, 1}: &Robot{ID: 1, Health: 15, Faction: P1Faction},
+				Loc{3, 1}: &Robot{ID: 2, Health: 15, Faction: P1Faction},
+				Loc{2, 0}: &Robot{ID: 3, Health: 15, Faction: P1Faction},
+				Loc{1, 2}: &Robot{ID: 4, Health: 15, Faction: P1Faction},
+				Loc{0, 2}: &Robot{ID: 5, Health: 15, Faction: P1Faction},
+				Loc{0, 1}: &Robot{ID: 6, Health: 15, Faction: P1Faction},
+				Loc{4, 2}: &Robot{ID: 7, Health: 20, Faction: P1Faction},
+			},
+			wantRound: 1,
+			turnList1: "1:ME,2:MW,3:MS,4:MN,5:ME,6:MS,7:ME",
+			turnList2: "",
+		},
 		// This checks four bots moving in a windmill, none should collide
 		{
 			config: BoardConfig{
@@ -366,6 +394,10 @@ func turnList(t string) (botapi.Turn_List, error) {
 	}
 
 	moves := strings.Split(t, ",")
+	if t == "" {
+		moves = []string{}
+	}
+
 	l, err := botapi.NewTurn_List(s, int32(len(moves)))
 	if err != nil {
 		return l, err

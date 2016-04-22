@@ -27,18 +27,28 @@ type (
 		Type CellType
 	}
 
+	moveStatus int
 	CellType   int
 	DamageType int
 
 	collisionMap    map[Loc][]*botMove
-	intersectionMap map[Intersection][]*botMove
+	intersectionMap map[Loc][]*botMove
 	moveMap         map[RobotID]*botMove
 
 	botMove struct {
-		Bot      *Robot
-		Location Loc
-		Turn     botapi.Turn
+		Bot     *Robot
+		Current Loc
+		Next    Loc
+		Turn    botapi.Turn
+		Status  moveStatus
 	}
+)
+
+const (
+	Pending moveStatus = iota
+	Failed
+	Successful
+	Checking
 )
 
 const (
@@ -90,9 +100,13 @@ type Board struct {
 	Round  int
 	NextID RobotID
 
-	Config       BoardConfig
-	p1Spawns     []Loc
-	pendingMoves map[*Robot]LocPair
+	Config   BoardConfig
+	p1Spawns []Loc
+
+	// Internal move things
+	moves         moveMap
+	collisions    collisionMap
+	intersections intersectionMap
 }
 
 type BoardConfig struct {
@@ -186,17 +200,14 @@ func (b *Board) removeBot(l Loc) {
 	}
 }
 
-func (b *Board) moveBot(bot *Robot, l LocPair) error {
+// Assume the caller knows what it's doing don't check the cell we're moving to
+func (b *Board) moveBot(bot *Robot, l LocPair) {
 	if !b.inBounds(l.Old) || !b.inBounds(l.New) {
-		return OutOfBounds
+		return
 	}
 
 	if l.Old == l.New {
-		return nil
-	}
-
-	if b.Cells[l.New.X][l.New.Y].Bot != nil {
-		return AlreadyOccupied
+		return
 	}
 
 	b.Cells[l.New.X][l.New.Y].Bot = bot
@@ -204,11 +215,9 @@ func (b *Board) moveBot(bot *Robot, l LocPair) error {
 
 	// Check the old locations and see if something new has moved in. If not,
 	// clear it out.
-	if oldBot := b.Cells[l.Old.X][l.Old.Y].Bot; oldBot != nil && oldBot.ID == bot.ID && l.Old != l.New {
-		fmt.Printf("Removing %d from %v because they're at %v\n", bot.ID, l.Old, l.New)
+	if oldBot := b.Cells[l.Old.X][l.Old.Y].Bot; oldBot != nil && oldBot.ID == bot.ID {
 		b.Cells[l.Old.X][l.Old.Y].Bot = nil
 	}
-	return nil
 }
 
 func (b *Board) spawnBots() {
@@ -237,86 +246,12 @@ func (b *Board) spawnBots() {
 	}
 }
 
-// TODO: Don't trust the client so much, someone not using the `game` package
-// could easily crash any of this. Problems:
-// - We don't check if robot IDS
-// - We assume that each list contains a move for each robot
-
-func (b *Board) addMoves(tl botapi.Turn_List, m moveMap, f Faction) {
-	for i := 0; i < tl.Len(); i++ {
-		t := tl.At(i)
-		id := RobotID(t.Id())
-		loc, bot := b.fromID(id)
-		// Ignore the move if that bot doesn't exist or isn't owned by the right
-		// player
-		if bot == nil || (bot != nil && bot.Faction != f) {
-			continue
-		}
-
-		m[id] = &botMove{
-			Bot:      bot,
-			Turn:     t,
-			Location: loc,
-		}
-	}
-}
-
 func (b *Board) Update(ta, tb botapi.Turn_List) {
 	// Put all the moves and bots into a map
-	moves := make(moveMap)
-	b.addMoves(ta, moves, P1Faction)
-	b.addMoves(tb, moves, P2Faction)
-
-	// Diagnostic stuff
-	for _, move := range moves {
-		fmt.Printf("Bot %d is at %v doing %s\n", move.Bot.ID, move.Location, move.Turn.Which().String())
-	}
-	for i, loc := range b.Bots {
-		fmt.Printf("b.Bots has %d at %v\n", i, loc)
-	}
-	b.printBoard()
-	// TODO: READ THIS: We figured out the issue. The problem is that we don't
-	// unravel which updates did happen and which didn't happen. We're saying
-	// that someone can move into a new space even when someone else failed to
-	// move out of it because of a collision. We need to rewrite this to look for
-	// that.
-
-	// TODO: Clean up collision/intersection checking code
-	c := make(collisionMap)
-	i := make(intersectionMap)
-	b.addCollisions(c, moves)
-	b.addIntersections(i, moves)
-
-	// Clear updates
-	b.pendingMoves = make(map[*Robot]LocPair)
-	for loc, ms := range c {
-		// If there's only one bot trying to get somewhere, just move them there
-		if len(ms) == 1 {
-			b.prepMove(ms[0].Bot, loc)
-		} else {
-			// Multiple bots, hurt 'em
-			fmt.Print("Collision between")
-			for _, m := range ms {
-				fmt.Print(" ", m.Bot.ID)
-				b.hurtBot(m, Collision)
-			}
-			fmt.Println("")
-		}
-	}
-
-	for _, ms := range i {
-		// If there's more than one bot travelling through a location, don't allow it
-		if len(ms) > 1 {
-			// Multiple bots, hurt 'em
-			for _, m := range ms {
-				// "Unaccept" their move
-				fmt.Println("Removing pending move %v for %d\n", b.pendingMoves[m.Bot], m.Bot.ID)
-				delete(b.pendingMoves, m.Bot)
-				b.hurtBot(m, Collision)
-			}
-		}
-	}
-	b.executeMoves()
+	b.moves = make(moveMap)
+	b.addMoves(ta, P1Faction)
+	b.addMoves(tb, P2Faction)
+	b.moveBots()
 	// Get rid of anyone who died in a collision
 	b.clearTheDead()
 
@@ -328,13 +263,13 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 
 	// Allow all attacks to be issued before removing bots, because there's no
 	// good, sensical way to order attacks. They all happen simultaneously
-	b.issueAttacks(moves)
+	b.issueAttacks()
 
 	// Get rid of anyone who was viciously murdered
 	b.clearTheDead()
 
 	// Boom goes the dynamite
-	b.issueSelfDestructs(moves)
+	b.issueSelfDestructs()
 
 	// Get rid of anyone killed in some kamikaze-shenanigans
 	b.clearTheDead()
@@ -346,8 +281,106 @@ func (b *Board) Update(ta, tb botapi.Turn_List) {
 	}
 }
 
-func (b *Board) issueAttacks(moves moveMap) {
-	for _, move := range moves {
+// TODO: Don't trust the client so much, someone not using the `game` package
+// could easily crash any of this. Problems:
+// - We don't check if robot IDS
+// - We assume that each list contains a move for each robot
+
+func (b *Board) addMoves(tl botapi.Turn_List, f Faction) {
+	for i := 0; i < tl.Len(); i++ {
+		t := tl.At(i)
+		id := RobotID(t.Id())
+		loc, bot := b.fromID(id)
+		// Ignore the move if that bot doesn't exist or isn't owned by the right
+		// player
+		if bot == nil || (bot != nil && bot.Faction != f) {
+			continue
+		}
+
+		b.moves[id] = &botMove{
+			Bot:     bot,
+			Turn:    t,
+			Current: loc,
+			Next:    b.nextLoc(bot, t),
+		}
+	}
+}
+
+func (b *Board) setBotStatus(bot *Robot) moveStatus {
+	move := b.moves[bot.ID]
+	// We set our status to checking so we know which bot we're working on
+	move.Status = Checking
+	// If they don't plan on going anywhere (wait, attack, guard, etc), that's
+	// fine with us. We consider not moving to be failed because that helps us
+	// unravel our dependency chain
+	if move.Current == move.Next {
+		move.Status = Failed
+		return move.Status
+	}
+
+	cols := b.collisions[move.Next]
+	if len(cols) > 1 {
+		move.Status = Failed
+		return move.Status
+	}
+
+	ints := b.intersections[move.intersection()]
+	if len(ints) > 1 {
+		move.Status = Failed
+		return move.Status
+	}
+
+	// If we're still here we can continue checking to see if their move is
+	// valid. Next step: check if there's someone where they want to be
+	move.Status = b.unravel(move)
+	return move.Status
+}
+
+func (b *Board) unravel(startMove *botMove) moveStatus {
+	nBot := b.At(startMove.Next)
+	if nBot != nil {
+		// Someone is in the spot we're heading, check if they've been greenlighted to move
+		nMove := b.moves[nBot.ID]
+		switch nMove.Status {
+		case Successful, Failed:
+			// If we know the person in our spot has succeeded or failed, that
+			// determines our success as it is.
+			return nMove.Status
+		case Checking:
+			// Similarly, if we've made it back to ourself (Checking), then everyone
+			// can move
+			return Successful
+		case Pending:
+			// If we don't know their status, we'll have to check them. Incoming recursion
+			return b.setBotStatus(nBot)
+		}
+	}
+	// If there's nobody there, go for it
+	return Successful
+}
+
+func (b *Board) moveBots() {
+	b.addCollisions()
+
+	for _, move := range b.moves {
+		// Pick a random bot in Pending
+		if move.Status == Pending {
+			// This is where all the magic happens
+			b.setBotStatus(move.Bot)
+		}
+	}
+
+	for _, move := range b.moves {
+		if move.Status == Successful {
+			b.moveBot(move.Bot, LocPair{Old: move.Current, New: move.Next})
+		} else if move.Status == Failed && move.Turn.Which() == botapi.Turn_Which_move {
+			b.hurtBot(move, Collision)
+		}
+	}
+}
+
+func (b *Board) issueAttacks() {
+	for _, move := range b.moves {
 		if move.Turn.Which() != botapi.Turn_Which_attack {
 			continue
 		}
@@ -355,30 +388,30 @@ func (b *Board) issueAttacks(moves moveMap) {
 		// They're attacking
 		xOff, yOff := directionOffsets(move.Turn.Attack())
 		attackLoc := Loc{
-			X: move.Location.X + xOff,
-			Y: move.Location.Y + yOff,
+			X: move.Current.X + xOff,
+			Y: move.Current.Y + yOff,
 		}
 
 		// If there's a bot at the attack location, make them sad
 		// You *can* attack your own robots
 		if victim := b.Cells[attackLoc.X][attackLoc.Y].Bot; victim != nil {
-			b.hurtBot(moves[victim.ID], Attack)
+			b.hurtBot(b.moves[victim.ID], Attack)
 		}
 	}
 }
 
-func (b *Board) issueSelfDestructs(moves moveMap) {
-	for _, move := range moves {
+func (b *Board) issueSelfDestructs() {
+	for _, move := range b.moves {
 		if move.Turn.Which() != botapi.Turn_Which_selfDestruct {
 			continue
 		}
 
 		// They're Metro-booming on production:
 		// (https://www.youtube.com/watch?v=NiM5ARaexPE)
-		for _, boomLoc := range b.surrounding(move.Location) {
+		for _, boomLoc := range b.surrounding(move.Current) {
 			// If there's a bot in the blast radius
 			if victim := b.Cells[boomLoc.X][boomLoc.Y].Bot; victim != nil {
-				b.hurtBot(moves[victim.ID], Destruct)
+				b.hurtBot(b.moves[victim.ID], Destruct)
 			}
 		}
 
@@ -417,23 +450,21 @@ func (b *Board) surrounding(loc Loc) []Loc {
 	return vLocs
 }
 
-func (b *Board) addCollisions(c collisionMap, moves moveMap) {
-	for _, move := range moves {
-		// Add where they want to move
-		nextLoc := b.nextLoc(move)
-		c[nextLoc] = append(c[nextLoc], move)
+func (b *Board) addCollisions() {
+	b.collisions = make(collisionMap)
+	b.intersections = make(intersectionMap)
+	for _, move := range b.moves {
+		in := move.intersection()
+		b.intersections[in] = append(b.intersections[in], move)
+
+		b.collisions[move.Next] = append(b.collisions[move.Next], move)
 	}
 }
 
-func (b *Board) addIntersections(i intersectionMap, moves moveMap) {
-	for _, move := range moves {
-		nextLoc := b.nextLoc(move)
-		// Add where they'll be passing through
-		in := Intersection{
-			X: move.Location.X + nextLoc.X,
-			Y: move.Location.Y + nextLoc.Y,
-		}
-		i[in] = append(i[in], move)
+func (bm *botMove) intersection() Loc {
+	return Loc{
+		X: bm.Current.X + bm.Next.X,
+		Y: bm.Current.Y + bm.Next.Y,
 	}
 }
 
@@ -470,22 +501,6 @@ func (b *Board) clearTheDead() {
 	}
 }
 
-func (b *Board) prepMove(bot *Robot, loc Loc) error {
-	oldLoc := b.robotLoc(bot)
-	if manhattanDistance(oldLoc, loc) > 1 {
-		return errors.New("Teleporting or some ish")
-	}
-	fmt.Printf("Adding pending move from %v to %v for %d\n", oldLoc, loc, bot.ID)
-	b.pendingMoves[bot] = LocPair{Old: oldLoc, New: loc}
-	return nil
-}
-
-func (b *Board) executeMoves() {
-	for bot, loc := range b.pendingMoves {
-		b.moveBot(bot, loc)
-	}
-}
-
 func manhattanDistance(loc1, loc2 Loc) int {
 	return abs(loc1.X-loc2.X) + abs(loc1.Y-loc2.Y)
 }
@@ -497,16 +512,16 @@ func abs(x int) int {
 	return x
 }
 
-func (b *Board) nextLoc(move *botMove) Loc {
-	currentLoc := b.robotLoc(move.Bot)
+func (b *Board) nextLoc(bot *Robot, turn botapi.Turn) Loc {
+	currentLoc := b.robotLoc(bot)
 	// If they aren't moving, return their current loc
-	if move.Turn.Which() != botapi.Turn_Which_move {
+	if turn.Which() != botapi.Turn_Which_move {
 		return currentLoc
 	}
 
 	// They're moving, return where they're going
 
-	xOff, yOff := directionOffsets(move.Turn.Move())
+	xOff, yOff := directionOffsets(turn.Move())
 	nextLoc := Loc{
 		X: currentLoc.X + xOff,
 		Y: currentLoc.Y + yOff,
