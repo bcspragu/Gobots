@@ -31,7 +31,7 @@ func TestEmptyBoardIsEmpty(t *testing.T) {
 	}
 }
 
-func TestBoard_addBot(t *testing.T) {
+func TestBoardAddBot(t *testing.T) {
 	b := EmptyBoard(testConfig)
 	loc := Loc{1, 2}
 	b.addBot(&Robot{
@@ -54,8 +54,9 @@ func TestBoard_addBot(t *testing.T) {
 	}
 }
 
-func TestUpdate(t *testing.T) {
+func TestBoardUpdate(t *testing.T) {
 	tests := []struct {
+		name      string
 		config    BoardConfig
 		init      map[Loc]*Robot
 		initRound int
@@ -65,8 +66,8 @@ func TestUpdate(t *testing.T) {
 		turnList1 string
 		turnList2 string
 	}{
-		// This is no-op update change detector test case
 		{
+			name: "This is no-op update change detector test case",
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
@@ -83,8 +84,8 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:W",
 			turnList2: "456:W",
 		},
-		// This checks a simple collision
 		{
+			name: "This checks a simple collision",
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
@@ -101,8 +102,26 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:ME",
 			turnList2: "456:MW",
 		},
-		// This checks a complicated dependency chain that needs to be unravelled
 		{
+			name: "This checks bots trying to go out of bounds. They shouldn't move, and they should lose health",
+			config: BoardConfig{
+				Size: Loc{X: 5, Y: 5},
+			},
+			init: map[Loc]*Robot{
+				Loc{0, 0}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
+				Loc{4, 4}: &Robot{ID: 456, Health: 20, Faction: P2Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{0, 0}: &Robot{ID: 123, Health: 15, Faction: P1Faction},
+				Loc{4, 4}: &Robot{ID: 456, Health: 15, Faction: P2Faction},
+			},
+			wantRound: 1,
+			turnList1: "123:MW",
+			turnList2: "456:MS",
+		},
+		{
+			name: "This checks a complicated dependency chain that needs to be unravelled",
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
@@ -129,8 +148,46 @@ func TestUpdate(t *testing.T) {
 			turnList1: "1:ME,2:MW,3:MS,4:MN,5:ME,6:MS,7:ME",
 			turnList2: "",
 		},
-		// This checks four bots moving in a windmill, none should collide
 		{
+			name: "This checks a conga line of bots around the outside the map windmilling",
+			config: BoardConfig{
+				Size: Loc{X: 4, Y: 4},
+			},
+			init: map[Loc]*Robot{
+				Loc{0, 0}: &Robot{ID: 1, Health: 20, Faction: P1Faction},
+				Loc{0, 1}: &Robot{ID: 2, Health: 20, Faction: P1Faction},
+				Loc{0, 2}: &Robot{ID: 3, Health: 20, Faction: P1Faction},
+				Loc{0, 3}: &Robot{ID: 4, Health: 20, Faction: P1Faction},
+				Loc{1, 3}: &Robot{ID: 5, Health: 20, Faction: P1Faction},
+				Loc{2, 3}: &Robot{ID: 6, Health: 20, Faction: P1Faction},
+				Loc{3, 3}: &Robot{ID: 7, Health: 20, Faction: P1Faction},
+				Loc{3, 2}: &Robot{ID: 8, Health: 20, Faction: P1Faction},
+				Loc{3, 1}: &Robot{ID: 9, Health: 20, Faction: P1Faction},
+				Loc{3, 0}: &Robot{ID: 10, Health: 20, Faction: P1Faction},
+				Loc{2, 0}: &Robot{ID: 11, Health: 20, Faction: P1Faction},
+				Loc{1, 0}: &Robot{ID: 12, Health: 20, Faction: P1Faction},
+			},
+			initRound: 0,
+			want: map[Loc]*Robot{
+				Loc{0, 1}: &Robot{ID: 1, Health: 20, Faction: P1Faction},
+				Loc{0, 2}: &Robot{ID: 2, Health: 20, Faction: P1Faction},
+				Loc{0, 3}: &Robot{ID: 3, Health: 20, Faction: P1Faction},
+				Loc{1, 3}: &Robot{ID: 4, Health: 20, Faction: P1Faction},
+				Loc{2, 3}: &Robot{ID: 5, Health: 20, Faction: P1Faction},
+				Loc{3, 3}: &Robot{ID: 6, Health: 20, Faction: P1Faction},
+				Loc{3, 2}: &Robot{ID: 7, Health: 20, Faction: P1Faction},
+				Loc{3, 1}: &Robot{ID: 8, Health: 20, Faction: P1Faction},
+				Loc{3, 0}: &Robot{ID: 9, Health: 20, Faction: P1Faction},
+				Loc{2, 0}: &Robot{ID: 10, Health: 20, Faction: P1Faction},
+				Loc{1, 0}: &Robot{ID: 11, Health: 20, Faction: P1Faction},
+				Loc{0, 0}: &Robot{ID: 12, Health: 20, Faction: P1Faction},
+			},
+			wantRound: 1,
+			turnList1: "1:MS,2:MS,3:MS,4:ME,5:ME,6:ME,7:MN,8:MN,9:MN,10:MW,11:MW,12:MW",
+			turnList2: "",
+		},
+		{
+			name: "This checks four bots moving in a windmill, none should collide",
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
@@ -151,9 +208,8 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:MN,124:MS",
 			turnList2: "456:MW,457:ME",
 		},
-		// This checks two bots trying to swap places, which isn't allowed. They
-		// collide instead.
 		{
+			name: "This checks two bots trying to swap places, which isn't allowed. They collide instead.",
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
@@ -170,8 +226,8 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:ME",
 			turnList2: "456:MW",
 		},
-		// This checks basic attacking
 		{
+			name: "This checks basic attacking",
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
@@ -188,8 +244,8 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:W",
 			turnList2: "456:AW",
 		},
-		// This checks guarding from an attack
 		{
+			name: "This checks guarding from an attack",
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
@@ -206,8 +262,8 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:G",
 			turnList2: "456:AW",
 		},
-		// This checks guarding from a self-destruct
 		{
+			name: "This checks guarding from a self-destruct",
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
@@ -223,8 +279,8 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:G",
 			turnList2: "456:D",
 		},
-		// This checks guarding from a collision
 		{
+			name: "This checks guarding from a collision",
 			config: BoardConfig{
 				Size:      Loc{X: 5, Y: 5},
 				CellTyper: allValid{},
@@ -243,36 +299,36 @@ func TestUpdate(t *testing.T) {
 			turnList1: "123:G",
 			turnList2: "456:MW",
 		},
-		// This checks self-destructing
 		{
+			name: "This checks self-destructing",
 			config: BoardConfig{
 				Size: Loc{X: 5, Y: 5},
 			},
 			init: map[Loc]*Robot{
 				Loc{4, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction}, // Out of blast radius
 				Loc{2, 1}: &Robot{ID: 456, Health: 20, Faction: P2Faction}, // Exploder
-
-				Loc{1, 0}: &Robot{ID: 124, Health: 20, Faction: P1Faction}, // In blast radius
-				Loc{2, 0}: &Robot{ID: 125, Health: 20, Faction: P1Faction}, // In blast radius
-				Loc{3, 0}: &Robot{ID: 126, Health: 20, Faction: P1Faction}, // In blast radius
-				Loc{1, 1}: &Robot{ID: 127, Health: 20, Faction: P1Faction}, // In blast radius
-				Loc{3, 1}: &Robot{ID: 128, Health: 20, Faction: P1Faction}, // In blast radius
-				Loc{1, 2}: &Robot{ID: 129, Health: 20, Faction: P1Faction}, // In blast radius
-				Loc{2, 2}: &Robot{ID: 130, Health: 20, Faction: P1Faction}, // In blast radius
-				Loc{3, 2}: &Robot{ID: 131, Health: 20, Faction: P1Faction}, // In blast radius
+				// In blast radius
+				Loc{1, 0}: &Robot{ID: 124, Health: 20, Faction: P1Faction},
+				Loc{2, 0}: &Robot{ID: 125, Health: 20, Faction: P1Faction},
+				Loc{3, 0}: &Robot{ID: 126, Health: 20, Faction: P1Faction},
+				Loc{1, 1}: &Robot{ID: 127, Health: 20, Faction: P1Faction},
+				Loc{3, 1}: &Robot{ID: 128, Health: 20, Faction: P1Faction},
+				Loc{1, 2}: &Robot{ID: 129, Health: 20, Faction: P1Faction},
+				Loc{2, 2}: &Robot{ID: 130, Health: 20, Faction: P1Faction},
+				Loc{3, 2}: &Robot{ID: 131, Health: 20, Faction: P1Faction},
 			},
 			initRound: 0,
 			want: map[Loc]*Robot{
 				Loc{4, 1}: &Robot{ID: 123, Health: 20, Faction: P1Faction},
-
-				Loc{1, 0}: &Robot{ID: 124, Health: 5, Faction: P1Faction}, // In blast radius
-				Loc{2, 0}: &Robot{ID: 125, Health: 5, Faction: P1Faction}, // In blast radius
-				Loc{3, 0}: &Robot{ID: 126, Health: 5, Faction: P1Faction}, // In blast radius
-				Loc{1, 1}: &Robot{ID: 127, Health: 5, Faction: P1Faction}, // In blast radius
-				Loc{3, 1}: &Robot{ID: 128, Health: 5, Faction: P1Faction}, // In blast radius
-				Loc{1, 2}: &Robot{ID: 129, Health: 5, Faction: P1Faction}, // In blast radius
-				Loc{2, 2}: &Robot{ID: 130, Health: 5, Faction: P1Faction}, // In blast radius
-				Loc{3, 2}: &Robot{ID: 131, Health: 5, Faction: P1Faction}, // In blast radius
+				// In blast radius
+				Loc{1, 0}: &Robot{ID: 124, Health: 5, Faction: P1Faction},
+				Loc{2, 0}: &Robot{ID: 125, Health: 5, Faction: P1Faction},
+				Loc{3, 0}: &Robot{ID: 126, Health: 5, Faction: P1Faction},
+				Loc{1, 1}: &Robot{ID: 127, Health: 5, Faction: P1Faction},
+				Loc{3, 1}: &Robot{ID: 128, Health: 5, Faction: P1Faction},
+				Loc{1, 2}: &Robot{ID: 129, Health: 5, Faction: P1Faction},
+				Loc{2, 2}: &Robot{ID: 130, Health: 5, Faction: P1Faction},
+				Loc{3, 2}: &Robot{ID: 131, Health: 5, Faction: P1Faction},
 			},
 			wantRound: 1,
 			turnList1: "123:W,124:W,125:W,126:W,127:W,128:W,129:W,130:W,131:W",
@@ -307,9 +363,14 @@ func TestUpdate(t *testing.T) {
 			t.Errorf("b.Round = %d; want %d", b.Round, test.wantRound)
 		}
 
+		var displayedDescription bool
 		for l, bot := range test.want {
 			r := b.At(l)
 			if *r != *bot {
+				if !displayedDescription {
+					t.Errorf("Failed on test case: %s", test.name)
+					displayedDescription = true
+				}
 				t.Errorf("b.At(%v) = %#v; want %#v", l, *r, *bot)
 			}
 		}
