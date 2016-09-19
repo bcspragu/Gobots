@@ -1,4 +1,4 @@
-using Go = import "../../../../zombiezen.com/go/capnproto2/go.capnp";
+using Go = import "../../../../zombiezen.com/go/capnproto2/std/go.capnp";
 
 @0x834c2fcbeb96c6bd;
 

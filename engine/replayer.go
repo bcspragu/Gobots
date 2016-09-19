@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"log"
-
 	"github.com/bcspragu/Gobots/botapi"
 	"github.com/gopherjs/gopherjs/js"
 )
@@ -109,7 +107,6 @@ func boardFromWireWithInitial(wire botapi.InitialBoard) (*Board, error) {
 	if err != nil {
 		return b, err
 	}
-	log.Printf("BoardFromWireWithInitial: Loaded %d bots", bots.Len())
 
 	for i := 0; i < bots.Len(); i++ {
 		bot := bots.At(i)

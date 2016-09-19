@@ -1,9 +1,7 @@
 package game
 
 import (
-	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/signal"
@@ -16,11 +14,15 @@ import (
 	"zombiezen.com/go/capnproto2/rpc"
 )
 
-var (
-	flags         = flag.NewFlagSet("game flags", flag.ContinueOnError)
-	serverAddress = flags.String("server_address", "gobotgame.com:8001", "address of API server")
-	retryInterval = flags.Duration("retry_interval", 10*time.Second, "how often (in seconds) to retry connecting to the server after losing a connection")
-)
+type ServerConfig struct {
+	RetryInterval time.Duration // How often to retry connecting to the server after losing a connection
+	ServerAddress string        // Address of API server
+}
+
+var defaultConfig = &ServerConfig{
+	RetryInterval: 10 * time.Second,
+	ServerAddress: "gobotgame.com:8001",
+}
 
 // Client represents a connection to the game server.
 type Client struct {
@@ -73,8 +75,11 @@ func (c *Client) RegisterAI(name, token string, factory Factory) error {
 }
 
 // connect wraps the Dial and RegisterAI functionality
-func connect(name, token string, factory Factory) (*Client, error) {
-	c, err := Dial(*serverAddress)
+func connect(name, token string, factory Factory, config *ServerConfig) (*Client, error) {
+	if config == nil {
+		config = defaultConfig
+	}
+	c, err := Dial(config.ServerAddress)
 	if err != nil {
 		return c, fmt.Errorf("Failed to connect to server: %v", err)
 	}
@@ -87,10 +92,11 @@ func connect(name, token string, factory Factory) (*Client, error) {
 // StartServerForFactory connects to the server with the given robot name and
 // user token, and registers the robot provided by the factory function
 func StartServerForFactory(name, token string, factory Factory) {
-	flags.SetOutput(ioutil.Discard)
-	flags.Parse(os.Args[1:])
+	Connect(name, token, factory, defaultConfig)
+}
 
-	c, err := connect(name, token, factory)
+func Connect(name, token string, factory Factory, config *ServerConfig) {
+	c, err := connect(name, token, factory, config)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(exitFail)
@@ -112,7 +118,7 @@ loop:
 		select {
 		case <-retryChan:
 			fmt.Fprintln(os.Stderr, "Lost connection to server, trying to reconnect...")
-			c, err = connect(name, token, factory)
+			c, err = connect(name, token, factory, config)
 			if err == nil {
 				fmt.Fprintf(os.Stderr, "Reconnected bot %s successfully!\n", name)
 				// Wait until we lose the connection again
@@ -121,7 +127,7 @@ loop:
 				if strings.Contains(err.Error(), "connection refused") {
 					// If we can't connect, just wait ten (or --retry_interval) seconds and try again
 					go func() {
-						retryChan <- <-time.After(*retryInterval)
+						retryChan <- <-time.After(config.RetryInterval)
 					}()
 				} else {
 					// Fail on all other errors, like the server saying you have an invalid token

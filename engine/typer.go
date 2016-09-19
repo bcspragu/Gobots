@@ -85,11 +85,9 @@ func newBaseCircle(size Loc) *baseCircle {
 }
 
 func (c *baseCircle) firstPass(x, y int) CellType {
-	x += 1
-	y += 1
-	dx, dy := absFloat(float64(c.size.X+1)/2.0-float64(x)), absFloat(float64(c.size.Y+1)/2.0-float64(y))
+	dx, dy := absFloat(float64(c.size.X-1)/2.0-float64(x)), absFloat(float64(c.size.Y-1)/2.0-float64(y))
 	d := math.Sqrt(dx*dx + dy*dy)
-	if d < float64(c.size.X+1)/2.0 {
+	if d < float64(c.size.X-2)/2.0 {
 		return Valid
 	} else {
 		return Invalid

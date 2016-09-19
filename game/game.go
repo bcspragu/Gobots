@@ -84,7 +84,7 @@ type Action struct {
 	Direction Direction
 }
 
-func (a Action) toWire(id uint32, wire botapi.Turn) {
+func (a Action) ToWire(id uint32, wire botapi.Turn) {
 	wire.SetId(id)
 	switch a.Kind {
 	case Wait:
@@ -190,7 +190,7 @@ func (a *aiAdapter) TakeTurn(call botapi.Ai_takeTurn) error {
 	}
 	for i, r := range robots {
 		t := ai.Act(b, r)
-		t.toWire(r.ID, turns.At(i))
+		t.ToWire(r.ID, turns.At(i))
 	}
 	call.Results.SetTurns(turns)
 	return nil
