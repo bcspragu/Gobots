@@ -19,6 +19,10 @@ import (
 var (
 	addr      = flag.String("addr", ":8000", "HTTP server address")
 	apiAddr   = flag.String("api_addr", ":8001", "RPC server address")
+	dbPath    = flag.String("db_path", "gobots.db", "Location of DB file")
+	hashPath  = flag.String("hash_path", "hashKey", "Location of hash key file")
+	blockPath = flag.String("block_path", "blockKey", "Location of block key file")
+
 	templates = tmpl{template.Must(template.ParseGlob("templates/*.html"))}
 
 	db               datastore
@@ -30,11 +34,11 @@ func main() {
 	flag.Parse()
 	var err error
 
-	if db, err = initDB("gobots.db"); err != nil {
+	if db, err = initDB(*dbPath); err != nil {
 		log.Fatal("Couldn't open the database, SHUT IT DOWN")
 	}
 
-	if s, err = initKeys(); err != nil {
+	if s, err = initKeys(*hashPath, *blockPath); err != nil {
 		log.Fatal("Can't encrypt the cookies! WHATEVER WILL WE DO")
 	}
 

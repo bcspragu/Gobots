@@ -76,17 +76,17 @@ func genName(n int) string {
 	return string(b)
 }
 
-func initKeys() (*securecookie.SecureCookie, error) {
+func initKeys(hashPath, blockPath string) (*securecookie.SecureCookie, error) {
 	var hashKey []byte
 	var blockKey []byte
 
-	if dat, err := loadOrGenKey("hashKey"); err != nil {
+	if dat, err := loadOrGenKey(hashPath); err != nil {
 		return nil, err
 	} else {
 		hashKey = dat
 	}
 
-	if dat, err := loadOrGenKey("blockKey"); err != nil {
+	if dat, err := loadOrGenKey(blockPath); err != nil {
 		return nil, err
 	} else {
 		blockKey = dat
