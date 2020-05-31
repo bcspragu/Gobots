@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"zombiezen.com/go/capnproto2"
-
 	"github.com/bcspragu/Gobots/botapi"
-	"github.com/boltdb/bolt"
+	capnp "zombiezen.com/go/capnproto2"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 var (
