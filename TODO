@@ -1,4 +1,0 @@
--Add methods for even easier usage of AI package [In Progress]
--Handle disconnect error cases better [Next on the hit list]
--Move 3rd party things to third_party
--Only send down the list of cells on the first RPC call

@@ -7,11 +7,13 @@ import (
 	"github.com/bcspragu/Gobots/game"
 )
 
-var token string
-var botName = flag.String("bot_name", "aggro", "which bot to use")
+var (
+	token   = flag.String("token", "", "which token to connect to the server with")
+	addr    = flag.String("addr", "localhost:8001", "The address of the game server")
+	botName = flag.String("bot_name", "aggro", "which bot to use")
+)
 
 func main() {
-	flag.StringVar(&token, "token", "", "which token to connect to the server with")
 	flag.Parse()
 
 	var g game.AI
@@ -25,8 +27,8 @@ func main() {
 	case "sunguard":
 		g = sunguard{}
 	}
-	game.Connect(*botName, token, game.ToFactory(g), &game.ServerConfig{
-		ServerAddress: "localhost:8081",
+	game.Connect(*botName, *token, game.ToFactory(g), &game.ServerConfig{
+		ServerAddress: *addr,
 		RetryInterval: 10 * time.Second,
 	})
 }
